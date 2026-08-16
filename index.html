@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="ms" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Financial Expenses Tracker</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="stylesheet" href="styles.css" />
+  <!-- Chart.js untuk Analisis Visual -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  
+  <!-- SUPABASE CONFIG: 1. Masukkan SDK Supabase -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+  <div class="app">
+    <!-- Header -->
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-logo">RM</div>
+        <div>
+          <h1>Financial Expenses Tracker</h1>
+          <p class="brand-sub">Track your spending. Know where your money goes.</p>
+        </div>
+      </div>
+      <div class="topbar-actions">
+        <button class="btn-ghost" id="themeToggle" title="Tukar Mod Cerah / Gelap">🌓 Tema</button>
+        <div class="profile-chip" id="profileChip" title="Tukar profil / Ahli Keluarga">
+          <span id="profileInitial">U</span>
+          <span id="profileName">User</span>
+        </div>
+      </div>
+    </header>
+
+    <div class="toolbar">
+      <div class="export-import-group">
+        <button class="btn-ghost" id="exportCsvBtn" title="Muat turun CSV (buka di Excel)">📊 Export CSV</button>
+        <button class="btn-ghost" id="importBtn" title="Muat naik fail sandaran">⬆ Import</button>
+        <input type="file" id="importFile" accept="application/json,.json" hidden />
+      </div>
+      <div class="budget-set">
+        <span class="budget-set-label">Bajet bulanan</span>
+        <span class="budget-prefix">RM</span>
+        <input type="number" id="budgetInput" min="0" step="10" placeholder="0" title="Tetapkan bajet bulanan" />
+      </div>
+    </div>
+
+    <!-- Dashboard cards -->
+    <section class="cards">
+      <div class="card hero">
+        <span class="card-label">Total Belanja Bulan Ini</span>
+        <span class="card-value" id="monthTotal">RM 0.00</span>
+        <span class="card-meta" id="monthRange">—</span>
+      </div>
+      <div class="card">
+        <span class="card-label">Transaksi Bulan Ini</span>
+        <span class="card-value sm" id="monthCount">0</span>
+        <span class="card-meta" id="monthAvg">Purata RM 0.00 / transaksi</span>
+      </div>
+      <div class="card">
+        <span class="card-label">Jumlah Keseluruhan</span>
+        <span class="card-value sm" id="allTotal">RM 0.00</span>
+        <span class="card-meta" id="allCount">0 transaksi direkod</span>
+      </div>
+    </section>
+
+    <!-- Monthly budget -->
+    <section class="budget" id="budgetWrap">
+      <div class="budget-head">
+        <span class="budget-title">Bajet <span id="budgetMonth"></span></span>
+        <span class="budget-fig" id="budgetFig">RM 0.00 / RM 0.00</span>
+      </div>
+      <div class="budget-bar"><div class="budget-fill" id="budgetFill"></div></div>
+      <div class="budget-msg" id="budgetMsg"></div>
+    </section>
+
+    <div class="grid">
+      <!-- Add expense with AI Camera/File Scan -->
+      <section class="panel">
+        <h2 class="panel-title">Tambah Perbelanjaan</h2>
+        
+        <!-- Receipt photo (disimpan sebagai nota sahaja) -->
+        <div class="ai-scanner-box">
+          <label class="ai-scan-btn" for="receiptInput">
+            📸 Tambah Foto Resit (simpan sebagai nota)
+          </label>
+          <input type="file" id="receiptInput" accept="image/*" capture="environment" hidden />
+          <p class="ai-scan-hint">Foto disimpan sebagai nota — tiada pembacaan automatik.</p>
+        </div>
+
+        <form id="expenseForm" class="form" autocomplete="off">
+          <label class="field">
+            <span>Jumlah (RM)</span>
+            <input type="number" id="amount" step="0.01" min="0.01" placeholder="0.00" required />
+          </label>
+          <label class="field">
+            <span>Kategori</span>
+            <select id="category" required></select>
+          </label>
+          <label class="field">
+            <span>Tarikh</span>
+            <input type="date" id="date" required />
+          </label>
+          <label class="field full">
+            <span>Nota (pilihan)</span>
+            <input type="text" id="note" maxlength="80" placeholder="Contoh: Makan tengah hari" />
+          </label>
+          <button type="submit" class="btn-primary">+ Tambah Rekod</button>
+          <div class="snackbar" id="snackbar"></div>
+        </form>
+      </section>
+
+      <!-- Breakdown & Visual Chart -->
+      <section class="panel">
+        <h2 class="panel-title">Pecahan & Analisis Visual</h2>
+        <div class="chart-container" style="position: relative; height: 200px; margin-bottom: 16px;">
+          <canvas id="expenseChart"></canvas>
+        </div>
+        <div id="breakdown" class="breakdown"></div>
+      </section>
+    </div>
+
+    <!-- Transactions -->
+    <section class="panel">
+      <div class="panel-head">
+        <h2 class="panel-title">Senarai Transaksi</h2>
+        <div class="month-nav">
+          <button class="btn-ghost" id="prevMonth" title="Bulan sebelum">‹</button>
+          <span id="monthLabel" class="month-label">—</span>
+          <button class="btn-ghost" id="nextMonth" title="Bulan selepas">›</button>
+          <button class="btn-ghost toggle" id="allToggle">Semua</button>
+        </div>
+      </div>
+      <div id="txList" class="tx-list"></div>
+    </section>
+
+    <footer class="foot">
+      Data disimpan secara lokal di pelayar anda (v1.2). Log masuk akaun awan tersedia untuk sinkronisasi merentasi peranti.
+    </footer>
+  </div>
+
+  <!-- SUPABASE CONFIG: 2. Letakkan kod sambungan API di sini (sebelum fail app.js) -->
+  <script>
+    // Gantikan dengan maklumat Project URL & Publishable Key anda dari Supabase
+    const SUPABASE_URL = 'https://knneeyyhewylmogdcwzz.supabase.co';
+    const SUPABASE_ANON_KEY = 'sb_publishable_QqfanjKt7sHLLLrpKhvbng_i9RNtwJv';
+
+    const { createClient } = supabase;
+    window.supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  </script>
+
+  <script src="app.js"></script>
+</body>
+</html>

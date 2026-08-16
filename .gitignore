@@ -1,0 +1,12 @@
+# OS junk
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs / temp
+*.log
+
+# Node (kalau ada build nanti)
+node_modules/
+dist/
+build/
