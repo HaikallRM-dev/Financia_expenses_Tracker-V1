@@ -14,7 +14,7 @@
 </head>
 <body>
   <div class="app">
-    <!-- Header -->
+    <!-- ============ HEADER ============ -->
     <header class="topbar">
       <div class="brand">
         <div class="brand-logo">RM</div>
@@ -32,63 +32,53 @@
       </div>
     </header>
 
-    <div class="toolbar">
-      <div class="export-import-group">
-        <button class="btn-ghost" id="exportCsvBtn" title="Muat turun CSV (buka di Excel)">📊 Export CSV</button>
-        <button class="btn-ghost" id="importBtn" title="Muat naik fail sandaran">⬆ Import</button>
-        <input type="file" id="importFile" accept="application/json,.json" hidden />
-      </div>
-      <div class="budget-set">
-        <span class="budget-set-label">Bajet bulanan</span>
-        <span class="budget-prefix">RM</span>
-        <input type="number" id="budgetInput" min="0" step="10" placeholder="0" title="Tetapkan bajet bulanan" />
-      </div>
-    </div>
-
-    <!-- Dashboard cards -->
-    <section class="cards">
+    <!-- ============ METRIC CARDS (melintang) ============ -->
+    <section class="cards metric-row">
       <div class="card hero">
-        <span class="card-label">Total Belanja Bulan Ini</span>
-        <span class="card-value" id="monthTotal">RM 0.00</span>
+        <span class="card-label">Baki (Pendapatan − Belanja)</span>
+        <span class="card-value" id="balanceTotal">RM 0.00</span>
+        <span class="card-meta" id="balanceMeta">—</span>
+      </div>
+      <div class="card">
+        <span class="card-label">Perbelanjaan Bulan Ini</span>
+        <span class="card-value sm" id="monthTotal">RM 0.00</span>
         <span class="card-meta" id="monthRange">—</span>
       </div>
       <div class="card">
-        <span class="card-label">Transaksi Bulan Ini</span>
-        <span class="card-value sm" id="monthCount">0</span>
-        <span class="card-meta" id="monthAvg">Purata RM 0.00 / transaksi</span>
+        <span class="card-label">Jumlah Transaksi</span>
+        <span class="card-value sm" id="allCount">0 transaksi direkod</span>
+        <span class="card-meta" id="monthCount">0 bulan ini</span>
       </div>
       <div class="card">
         <span class="card-label">Jumlah Keseluruhan</span>
         <span class="card-value sm" id="allTotal">RM 0.00</span>
-        <span class="card-meta" id="allCount">0 transaksi direkod</span>
+        <span class="card-meta" id="monthAvg">Purata RM 0.00 / transaksi</span>
       </div>
     </section>
 
-    <!-- Monthly budget -->
-    <section class="budget" id="budgetWrap">
-      <div class="budget-head">
-        <span class="budget-title">Bajet <span id="budgetMonth"></span></span>
-        <span class="budget-fig" id="budgetFig">RM 0.00 / RM 0.00</span>
-      </div>
-      <div class="budget-bar"><div class="budget-fill" id="budgetFill"></div></div>
-      <div class="budget-msg" id="budgetMsg"></div>
-    </section>
-
-    <div class="grid">
-      <!-- Add expense with AI Camera/File Scan -->
+    <!-- ============ 2-KOLUM GRID ============ -->
+    <div class="dashboard-grid">
+      <!-- KOLUM KIRI: Tambah Perbelanjaan -->
       <section class="panel">
         <h2 class="panel-title">Tambah Perbelanjaan</h2>
-        
-        <!-- Receipt photo (disimpan sebagai nota sahaja) -->
+
         <div class="ai-scanner-box">
           <label class="ai-scan-btn" for="receiptInput">
-            📸 Tambah Foto Resit (simpan sebagai nota)
+            📸 Tambah Foto Resit
           </label>
           <input type="file" id="receiptInput" accept="image/*" capture="environment" hidden />
-          <p class="ai-scan-hint">Foto disimpan sebagai nota — tiada pembacaan automatik.</p>
+          <p class="ai-scan-hint">Foto disimpan dalam rekod (bukan dibaca automatik).</p>
+          <img id="receiptThumb" class="receipt-thumb" style="display:none;" alt="Resit" />
         </div>
 
         <form id="expenseForm" class="form" autocomplete="off">
+          <div class="field full">
+            <span>Jenis</span>
+            <div class="type-toggle">
+              <label class="type-opt"><input type="radio" name="txType" value="exp" checked /> 💸 Perbelanjaan</label>
+              <label class="type-opt"><input type="radio" name="txType" value="inc" /> 💰 Pendapatan</label>
+            </div>
+          </div>
           <label class="field">
             <span>Jumlah (RM)</span>
             <input type="number" id="amount" step="0.01" min="0.01" placeholder="0.00" required />
@@ -105,22 +95,77 @@
             <span>Nota (pilihan)</span>
             <input type="text" id="note" maxlength="80" placeholder="Contoh: Makan tengah hari" />
           </label>
+          <button type="button" class="btn-ghost btn-cat-toggle" id="catToggleBtn">+ Kategori Baru</button>
           <button type="submit" class="btn-primary">+ Tambah Rekod</button>
           <div class="snackbar" id="snackbar"></div>
         </form>
+
+        <!-- Kategori baru (tersembunyi, toggle) -->
+        <div class="cat-add-panel" id="catAddPanel" style="display:none;">
+          <div class="cat-add-row">
+            <input type="text" id="newCatName" maxlength="20" placeholder="Nama kategori" />
+            <input type="color" id="newCatColor" value="#14b8a6" title="Warna" />
+            <button type="button" class="btn-ghost" id="addCatBtn">+ Tambah</button>
+          </div>
+        </div>
+
+        <!-- Bajet bulanan -->
+        <div class="budget-set">
+          <span class="budget-set-label">Bajet bulanan</span>
+          <span class="budget-prefix">RM</span>
+          <input type="number" id="budgetInput" min="0" step="10" placeholder="0" title="Tetapkan bajet bulanan" />
+        </div>
+        <section class="budget" id="budgetWrap">
+          <div class="budget-head">
+            <span class="budget-title">Bajet <span id="budgetMonth"></span></span>
+            <span class="budget-fig" id="budgetFig">RM 0.00 / RM 0.00</span>
+          </div>
+          <div class="budget-bar"><div class="budget-fill" id="budgetFill"></div></div>
+          <div class="budget-msg" id="budgetMsg"></div>
+        </section>
+
+        <div class="export-import-group">
+          <button class="btn-ghost" id="exportCsvBtn" title="Muat turun CSV (buka di Excel)">📊 Export CSV</button>
+          <button class="btn-ghost" id="exportJsonBtn" title="Muat turun sandaran JSON">💾 Export JSON</button>
+          <button class="btn-ghost" id="importBtn" title="Muat naik fail sandaran">⬆ Import</button>
+          <input type="file" id="importFile" accept="application/json,.json" hidden />
+        </div>
       </section>
 
-      <!-- Breakdown & Visual Chart -->
-      <section class="panel">
-        <h2 class="panel-title">Pecahan & Analisis Visual</h2>
-        <div class="chart-container" style="position: relative; height: 200px; margin-bottom: 16px;">
-          <canvas id="expenseChart"></canvas>
-        </div>
-        <div id="breakdown" class="breakdown"></div>
-      </section>
+      <!-- KOLUM KANAN: Chart + Insights + Comparison -->
+      <div class="right-col">
+        <section class="panel">
+          <h2 class="panel-title">Pecahan & Analisis Visual</h2>
+          <div class="chart-container" style="position: relative; height: 200px; margin-bottom: 16px;">
+            <canvas id="expenseChart"></canvas>
+          </div>
+          <div id="breakdown" class="breakdown"></div>
+        </section>
+
+        <section class="panel compare" id="comparePanel">
+          <h2 class="panel-title">📊 Perbandingan Bulanan</h2>
+          <div class="compare-row">
+            <div class="compare-card">
+              <span class="compare-label">Bulan Ini</span>
+              <span class="compare-val" id="cmpCur">RM 0.00</span>
+            </div>
+            <div class="compare-arrow" id="cmpArrow">→</div>
+            <div class="compare-card">
+              <span class="compare-label">Bulan Lepas</span>
+              <span class="compare-val" id="cmpPrev">RM 0.00</span>
+            </div>
+          </div>
+          <div class="compare-delta" id="cmpDelta"></div>
+        </section>
+
+        <section class="panel insights" id="insightsPanel">
+          <h2 class="panel-title">💡 Kesihatan Kewangan</h2>
+          <div id="insightsList" class="insights-list"></div>
+        </section>
+      </div>
     </div>
 
-    <!-- Transactions -->
+    <!-- ============ BAWAH: Senarai Transaksi (full-width) ============ -->
     <section class="panel">
       <div class="panel-head">
         <h2 class="panel-title">Senarai Transaksi</h2>
@@ -131,11 +176,15 @@
           <button class="btn-ghost toggle" id="allToggle">Semua</button>
         </div>
       </div>
+      <div class="search-row">
+        <input type="search" id="searchInput" placeholder="🔍 Cari nota / kategori..." class="search-input" />
+      </div>
+      <div class="cat-filter" id="catFilter"></div>
       <div id="txList" class="tx-list"></div>
     </section>
 
     <footer class="foot">
-      Data disimpan secara lokal di pelayar anda (v1.2). Log masuk akaun awan tersedia untuk sinkronisasi merentasi peranti.
+      Data disimpan secara lokal di pelayar anda (v1.3). Log masuk akaun awan tersedia untuk sinkronisasi merentasi peranti.
     </footer>
   </div>
 
@@ -150,5 +199,54 @@
   </script>
 
   <script src="app.js"></script>
+
+  <!-- Phase 11: Profile Modal -->
+  <div class="modal-overlay" id="profileModal" style="display:none;">
+    <div class="modal-box">
+      <h3>Tukar / Tambah Profil</h3>
+      <form id="profileForm" class="form" autocomplete="off">
+        <label class="field full"><span>Nama profil / ahli keluarga</span><input type="text" id="profileNameInput" required /></label>
+        <div class="modal-actions">
+          <button type="button" class="btn-ghost" onclick="closeProfile()">Batal</button>
+          <button type="submit" class="btn-primary">Simpan</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Phase 7: Receipt View Modal -->
+  <div class="modal-overlay" id="receiptViewModal" style="display:none;">
+    <div class="modal-box" style="max-width:480px;">
+      <h3>Foto Resit</h3>
+      <img id="receiptViewImg" style="width:100%; border-radius:10px; margin-top:10px;" alt="Resit" />
+      <div class="modal-actions">
+        <button type="button" class="btn-ghost" onclick="closeReceiptView()">Tutup</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Phase 3: Edit Transaction Modal -->
+  <div class="modal-overlay" id="editModal" style="display:none;">
+    <div class="modal-box">
+      <h3>Edit Transaksi</h3>
+      <form id="editForm" class="form" autocomplete="off">
+        <div class="field full">
+          <span>Jenis</span>
+          <div class="type-toggle">
+            <label class="type-opt"><input type="radio" name="editType" value="exp" checked /> 💸 Perbelanjaan</label>
+            <label class="type-opt"><input type="radio" name="editType" value="inc" /> 💰 Pendapatan</label>
+          </div>
+        </div>
+        <label class="field"><span>Jumlah (RM)</span><input type="number" id="editAmount" step="0.01" min="0.01" required /></label>
+        <label class="field"><span>Kategori</span><select id="editCategory" required></select></label>
+        <label class="field"><span>Tarikh</span><input type="date" id="editDate" required /></label>
+        <label class="field full"><span>Nota</span><input type="text" id="editNote" maxlength="80" /></label>
+        <div class="modal-actions">
+          <button type="button" class="btn-ghost" id="editCancel">Batal</button>
+          <button type="submit" class="btn-primary">Simpan</button>
+        </div>
+      </form>
+    </div>
+  </div>
 </body>
 </html>

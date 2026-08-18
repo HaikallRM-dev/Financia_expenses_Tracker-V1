@@ -10,3 +10,6 @@ desktop.ini
 node_modules/
 dist/
 build/
+
+# Local version backups (push latest only)
+*_backup.*

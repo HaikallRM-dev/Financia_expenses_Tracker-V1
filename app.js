@@ -5,10 +5,12 @@
   let transactions = [];
   let budgets = {};
   let showAll = false;
+  let filterCat = null; // Phase 2: null = all categories
+  let searchQ = ""; // Phase 10: search query
   let viewMonth = monthKey(new Date());
   let expenseChart = null;
 
-  const CATEGORIES = [
+  const DEFAULT_CATEGORIES = [
     { name: "Makanan", color: "#f97316" },
     { name: "Pengangkutan", color: "#3b82f6" },
     { name: "Belanja Rumah", color: "#14b8a6" },
@@ -18,7 +20,23 @@
     { name: "Pendidikan", color: "#8b5cf6" },
     { name: "Lain-lain", color: "#9a9aa5" },
   ];
-  const CAT_MAP = Object.fromEntries(CATEGORIES.map((c) => [c.name, c.color]));
+  // Phase 5: dynamic categories (default + custom per-profile)
+  function getCategories() {
+    let custom = [];
+    try { custom = JSON.parse(localStorage.getItem("fet_categories_" + currentProfile) || "[]"); }
+    catch (e) { custom = []; }
+    // merge: custom first, then defaults not already overridden
+    const names = new Set(custom.map((c) => c.name));
+    const merged = [...custom, ...DEFAULT_CATEGORIES.filter((c) => !names.has(c.name))];
+    return merged;
+  }
+  function getCatMap() {
+    const m = {};
+    getCategories().forEach((c) => { m[c.name] = c.color; });
+    return m;
+  }
+  let CATEGORIES = DEFAULT_CATEGORIES;
+  let CAT_MAP = Object.fromEntries(CATEGORIES.map((c) => [c.name, c.color]));
 
   const SUPABASE_TABLE = "Expenses"; // Jadual Supabase. Lajur: id(text PK), Title, Amount, Category, Date, note, created_at
   const PROFILE_KEY = "fet_active_profile";
@@ -52,6 +70,7 @@
     profileInitial: $("profileInitial"),
     profileName: $("profileName"),
     exportCsvBtn: $("exportCsvBtn"),
+    exportJsonBtn: $("exportJsonBtn"),
     importBtn: $("importBtn"),
     importFile: $("importFile"),
     budgetInput: $("budgetInput"),
@@ -215,7 +234,12 @@
   // RENDER
   // ============================================================
   function render() {
-    const scope = showAll ? transactions : transactions.filter((t) => monthKey(new Date(t.date)) === viewMonth);
+    let scope = showAll ? transactions : transactions.filter((t) => monthKey(new Date(t.date)) === viewMonth);
+    if (filterCat) scope = scope.filter((t) => t.category === filterCat);
+    if (searchQ) {
+      const q = searchQ.toLowerCase();
+      scope = scope.filter((t) => (t.note || "").toLowerCase().includes(q) || (t.category || "").toLowerCase().includes(q));
+    }
     const monthTx = transactions.filter((t) => monthKey(new Date(t.date)) === viewMonth);
     const mTotal = monthTx.reduce((s, t) => s + t.amount, 0);
     const aTotal = transactions.reduce((s, t) => s + t.amount, 0);
@@ -228,16 +252,28 @@
     els.allTotal.textContent = fmtRM(aTotal);
     els.allCount.textContent = transactions.length + " transaksi direkod";
 
+    // Phase 6: balance (income - expense)
+    const incTotal = transactions.filter((t) => t.type === "inc").reduce((s, t) => s + t.amount, 0);
+    const balance = incTotal - aTotal;
+    const balEl = document.getElementById("balanceTotal");
+    const balMeta = document.getElementById("balanceMeta");
+    if (balEl) {
+      balEl.textContent = fmtRM(balance);
+      balEl.style.color = balance >= 0 ? "var(--emerald-2)" : "var(--danger)";
+    }
+    if (balMeta) balMeta.textContent = "Pendapatan " + fmtRM(incTotal) + " • Belanja " + fmtRM(aTotal);
+
     const byCat = {};
     scope.forEach((t) => { byCat[t.category] = (byCat[t.category] || 0) + t.amount; });
     const entries = Object.entries(byCat).sort((a, b) => b[1] - a[1]);
     const max = entries.length ? entries[0][1] : 0;
+    const catColorMap = getCatMap();
 
     if (!entries.length) {
       els.breakdown.innerHTML = `<div class="bd-empty">Tiada perbelanjaan lagi. Tambah rekod di sebelah kiri.</div>`;
     } else {
       els.breakdown.innerHTML = entries.map(([cat, amt]) => {
-        const color = CAT_MAP[cat] || "#9a9aa5";
+        const color = catColorMap[cat] || "#9a9aa5";
         const pct = max ? (amt / max) * 100 : 0;
         return `<div class="bd-row">
           <div class="bd-top"><span class="bd-cat">${escapeHtml(cat)}</span><span class="bd-amt">${fmtRM(amt)}</span></div>
@@ -254,17 +290,21 @@
     } else {
       els.txList.innerHTML = sorted.map((t) => {
         const color = CAT_MAP[t.category] || "#9a9aa5";
+        const isInc = t.type === "inc";
         const ds = new Date(t.date).toLocaleDateString("ms-MY", { day: "numeric", month: "short", year: "numeric" });
-        return `<div class="tx">
+        const amtTxt = (isInc ? "+" : "−") + fmtRM(t.amount).replace("RM ", "");
+        return `<div class="tx ${isInc ? "inc" : ""}">
           <span class="tx-dot" style="background:${color}"></span>
           <div class="tx-main">
-            <div class="tx-cat">${escapeHtml(t.category)}</div>
+            <div class="tx-cat">${escapeHtml(t.category)} ${isInc ? "💰" : ""}</div>
             <div class="tx-note">${t.note ? escapeHtml(t.note) : ds}</div>
           </div>
           <div class="tx-right">
-            <span class="tx-amt">${fmtRM(t.amount)}</span>
+            <span class="tx-amt ${isInc ? "inc-amt" : ""}">${amtTxt}</span>
             <span class="tx-date">${ds}</span>
           </div>
+          ${t.receipt ? `<button class="tx-receipt" data-receipt="${t.id}" title="Lihat resit">📸</button>` : ""}
+          <button class="tx-edit" data-id="${t.id}" title="Edit">✏️</button>
           <button class="tx-del" data-id="${t.id}" title="Padam">✕</button>
         </div>`;
       }).join("");
@@ -274,6 +314,9 @@
     els.allToggle.classList.toggle("active", showAll);
     renderProfile();
     renderBudget();
+    renderCatFilter();
+    renderInsights();
+    renderCompare();
   }
 
   function renderChart(entries) {
@@ -303,6 +346,96 @@
   function renderProfile() {
     els.profileName.textContent = currentProfile;
     els.profileInitial.textContent = currentProfile.charAt(0).toUpperCase();
+  }
+
+  // Phase 9: Monthly Comparison card
+  function renderCompare() {
+    const curEl = document.getElementById("cmpCur");
+    const prevEl = document.getElementById("cmpPrev");
+    const deltaEl = document.getElementById("cmpDelta");
+    const arrowEl = document.getElementById("cmpArrow");
+    if (!curEl) return;
+    const [y, m] = viewMonth.split("-").map(Number);
+    const prevKey = monthKey(new Date(y, m - 2, 1));
+    const curTotal = transactions.filter((t) => t.type !== "inc" && monthKey(new Date(t.date)) === viewMonth).reduce((s, t) => s + t.amount, 0);
+    const prevTotal = transactions.filter((t) => t.type !== "inc" && monthKey(new Date(t.date)) === prevKey).reduce((s, t) => s + t.amount, 0);
+    curEl.textContent = fmtRM(curTotal);
+    prevEl.textContent = fmtRM(prevTotal);
+    if (prevTotal > 0) {
+      const pct = Math.round(((curTotal - prevTotal) / prevTotal) * 100);
+      const up = pct > 0;
+      deltaEl.textContent = (up ? "Naik " : "Turun ") + Math.abs(pct) + "% berbanding " + monthName(prevKey);
+      deltaEl.className = "compare-delta " + (up ? "warn" : "good");
+      arrowEl.textContent = up ? "↑" : "↓";
+    } else {
+      deltaEl.textContent = prevTotal === 0 ? "Tiada data bulan lepas." : "";
+      deltaEl.className = "compare-delta";
+      arrowEl.textContent = "→";
+    }
+  }
+
+  // Phase 2: category filter chips
+  function renderCatFilter() {
+    const wrap = document.getElementById("catFilter");
+    if (!wrap) return;
+    const cats = getCategories().map((c) => c.name);
+    const cmap = getCatMap();
+    let html = `<button class="chip ${!filterCat ? "active" : ""}" data-cat="">Semua Kategori</button>`;
+    html += cats.map((c) => `<button class="chip ${filterCat === c ? "active" : ""}" data-cat="${c}" style="--chip:${cmap[c]}">${c}</button>`).join("");
+    wrap.innerHTML = html;
+    wrap.querySelectorAll(".chip").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const c = btn.dataset.cat;
+        filterCat = c || null;
+        render();
+      });
+    });
+  }
+
+  // Phase 4: Financial Insights — banding bulan ini vs bulan lepas
+  function renderInsights() {
+    const wrap = document.getElementById("insightsList");
+    if (!wrap) return;
+    const [y, m] = viewMonth.split("-").map(Number);
+    const prevKey = monthKey(new Date(y, m - 2, 1));
+    const cur = transactions.filter((t) => monthKey(new Date(t.date)) === viewMonth);
+    const prev = transactions.filter((t) => monthKey(new Date(t.date)) === prevKey);
+    const curTotal = cur.reduce((s, t) => s + t.amount, 0);
+    const prevTotal = prev.reduce((s, t) => s + t.amount, 0);
+
+    const out = [];
+    // 1. Perbandingan total
+    if (prevTotal > 0) {
+      const pct = Math.round(((curTotal - prevTotal) / prevTotal) * 100);
+      if (pct !== 0) {
+        const up = pct > 0;
+        out.push({ cls: up ? "warn" : "good", icon: up ? "⚠" : "✅",
+          msg: `Belanja bulan ini ${up ? "naik" : "turun"} ${Math.abs(pct)}% berbanding ${monthName(prevKey)}.` });
+      }
+    }
+    // 2. Kategori paling bergerak
+    const byCat = (arr) => { const o = {}; arr.forEach((t) => { o[t.category] = (o[t.category] || 0) + t.amount; }); return o; };
+    const cCur = byCat(cur), cPrev = byCat(prev);
+    let topMove = null;
+    Object.keys(cCur).forEach((cat) => {
+      const pc = cPrev[cat] || 0;
+      if (pc > 0) {
+        const pct = Math.round(((cCur[cat] - pc) / pc) * 100);
+        if (pct >= 20 && (!topMove || Math.abs(pct) > Math.abs(topMove.pct))) topMove = { cat, pct };
+      }
+    });
+    if (topMove) {
+      out.push({ cls: "warn", icon: "📈",
+        msg: `${topMove.cat} meningkat ${topMove.pct}% berbanding ${monthName(prevKey)}.` });
+    }
+    // 3. Kosong
+    if (!cur.length) out.push({ cls: "good", icon: "💡", msg: "Tiada perbelanjaan untuk " + monthName(viewMonth) + " lagi." });
+
+    if (!out.length) {
+      wrap.innerHTML = `<div class="insight good">✅ Belanja stabil berbanding bulan lepas.</div>`;
+      return;
+    }
+    wrap.innerHTML = out.map((o) => `<div class="insight ${o.cls}">${o.icon} ${escapeHtml(o.msg)}</div>`).join("");
   }
 
   function renderBudget() {
@@ -342,6 +475,7 @@
     const category = els.category.value;
     const date = els.date.value;
     const note = els.note.value.trim();
+    const type = (document.querySelector('input[name="txType"]:checked') || {}).value || "exp";
 
     if (!(amount > 0)) return showSnack("Sila masukkan jumlah sah.", false);
 
@@ -351,6 +485,8 @@
       category,
       date,
       note,
+      type,
+      receipt: pendingReceipt, // Phase 7: base64 receipt image (may be null)
       createdAt: Date.now(),
     };
     transactions.push(tx);
@@ -359,6 +495,7 @@
     showAll = false;
     els.form.reset();
     els.date.value = todayISO();
+    clearPendingReceipt(); // Phase 7: reset receipt after add
     render();
     showSnack("Rekod ditambah (disimpan secara lokal).", true);
     pushToCloud(tx);
@@ -456,19 +593,127 @@
   }
 
   // ============================================================
-  // S2: Resit — honest. Foto disimpan sebagai nota, TIADA baca automatik.
+  // PHASE 11 — PROFILE MODAL
   // ============================================================
+  function openProfile() {
+    const inp = document.getElementById("profileNameInput");
+    if (inp) inp.value = currentProfile;
+    document.getElementById("profileModal").style.display = "flex";
+  }
+  function closeProfile() {
+    document.getElementById("profileModal").style.display = "none";
+  }
+  function saveProfile(e) {
+    e.preventDefault();
+    const inp = document.getElementById("profileNameInput");
+    const name = inp && inp.value.trim();
+    if (!name) return showSnack("Nama profil diperlukan.", false);
+    currentProfile = name.slice(0, 24);
+    localStorage.setItem(PROFILE_KEY, currentProfile);
+    loadData();
+    refreshCategories();
+    render();
+    closeProfile();
+    showSnack("Profil: " + currentProfile, true);
+  }
+
+  // ============================================================
+  // Phase 7: Real receipt photo (base64 stored on transaction)
+  // ============================================================
+  let pendingReceipt = null; // base64 of selected receipt image (add form)
   function handleReceiptAttach(file) {
     if (!file) return;
-    els.note.value = "📸 " + file.name;
-    showSnack("Foto dilampirkan sebagai nota (tiada pembacaan automatik).", true);
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      pendingReceipt = e.target.result; // full data URL
+      const prev = document.getElementById("receiptThumb");
+      if (prev) { prev.src = pendingReceipt; prev.style.display = "block"; }
+      showSnack("Foto resit dilampirkan.", true);
+    };
+    reader.readAsDataURL(file);
+  }
+  function clearPendingReceipt() {
+    pendingReceipt = null;
+    const prev = document.getElementById("receiptThumb");
+    if (prev) { prev.src = ""; prev.style.display = "none"; }
+  }
+  function viewReceipt(id) {
+    const t = transactions.find((x) => x.id === id);
+    if (!t || !t.receipt) return;
+    const img = document.getElementById("receiptViewImg");
+    if (img) img.src = t.receipt;
+    document.getElementById("receiptViewModal").style.display = "flex";
+  }
+  function closeReceiptView() {
+    document.getElementById("receiptViewModal").style.display = "none";
+  }
+
+  // ============================================================
+  // PHASE 3 — EDIT TRANSACTION
+  // ============================================================
+  function openEdit(id) {
+    const t = transactions.find((x) => x.id === id);
+    if (!t) return;
+    document.getElementById("editAmount").value = t.amount;
+    document.getElementById("editCategory").innerHTML = getCategories().map((c) => `<option value="${c.name}" ${c.name === t.category ? "selected" : ""}>${c.name}</option>`).join("");
+    document.getElementById("editDate").value = t.date;
+    document.getElementById("editNote").value = t.note || "";
+    const tEl = document.querySelector(`#editModal input[name="editType"][value="${t.type || "exp"}"]`);
+    if (tEl) tEl.checked = true;
+    document.getElementById("editModal").dataset.id = id;
+    document.getElementById("editModal").style.display = "flex";
+  }
+  function closeEdit() {
+    document.getElementById("editModal").style.display = "none";
+  }
+  async function saveEdit(e) {
+    e.preventDefault();
+    const id = document.getElementById("editModal").dataset.id;
+    const t = transactions.find((x) => x.id === id);
+    if (!t) return closeEdit();
+    const amount = parseFloat(document.getElementById("editAmount").value);
+    if (!(amount > 0)) return showSnack("Sila masukkan jumlah sah.", false);
+    t.amount = Math.round(amount * 100) / 100;
+    t.category = document.getElementById("editCategory").value;
+    t.date = document.getElementById("editDate").value;
+    t.note = document.getElementById("editNote").value.trim();
+    t.type = (document.querySelector('#editModal input[name="editType"]:checked') || {}).value || "exp";
+    save();
+    closeEdit();
+    render();
+    showSnack("Rekod dikemas kini.", true);
+    pushToCloud(t);
+  }
+
+  // Phase 5: refresh category lists (default + custom)
+  function refreshCategories() {
+    CATEGORIES = getCategories();
+    CAT_MAP = getCatMap();
+    els.category.innerHTML = CATEGORIES.map((c) => `<option value="${c.name}">${c.name}</option>`).join("");
+  }
+  function addCategory() {
+    const name = document.getElementById("newCatName").value.trim();
+    const color = document.getElementById("newCatColor").value;
+    if (!name) return showSnack("Nama kategori kosong.", false);
+    let custom = [];
+    try { custom = JSON.parse(localStorage.getItem("fet_categories_" + currentProfile) || "[]"); }
+    catch (e) { custom = []; }
+    if (custom.some((c) => c.name === name) || DEFAULT_CATEGORIES.some((c) => c.name === name)) {
+      return showSnack("Kategori '" + name + "' dah wujud.", false);
+    }
+    custom.push({ name, color });
+    localStorage.setItem("fet_categories_" + currentProfile, JSON.stringify(custom));
+    document.getElementById("newCatName").value = "";
+    refreshCategories();
+    renderCatFilter();
+    showSnack("Kategori '" + name + "' ditambah.", true);
   }
 
   // ============================================================
   // INIT
   // ============================================================
   async function init() {
-    els.category.innerHTML = CATEGORIES.map((c) => `<option value="${c.name}">${c.name}</option>`).join("");
+    refreshCategories();
     els.date.value = todayISO();
 
     loadData();
@@ -484,15 +729,9 @@
       localStorage.setItem("fet_theme", next);
     });
 
-    els.profileChip.addEventListener("click", () => {
-      const name = prompt("Masukkan nama profil / ahli keluarga:", currentProfile);
-      if (name && name.trim()) {
-        currentProfile = name.trim().slice(0, 24);
-        localStorage.setItem(PROFILE_KEY, currentProfile);
-        loadData();
-        render();
-      }
-    });
+    els.profileChip.addEventListener("click", openProfile);
+
+    document.getElementById("addCatBtn").addEventListener("click", addCategory);
 
     els.form.addEventListener("submit", addTransaction);
     els.prevMonth.addEventListener("click", () => { showAll = false; const [y, m] = viewMonth.split("-").map(Number); viewMonth = monthKey(new Date(y, m - 2, 1)); render(); });
@@ -507,7 +746,20 @@
     });
 
     els.exportCsvBtn.addEventListener("click", exportCsv);
+    els.exportJsonBtn.addEventListener("click", exportJson);
     els.importBtn.addEventListener("click", () => els.importFile.click());
+    const searchInput = document.getElementById("searchInput");
+    if (searchInput) searchInput.addEventListener("input", (e) => { searchQ = e.target.value.trim(); render(); });
+
+    const catToggleBtn = document.getElementById("catToggleBtn");
+    const catAddPanel = document.getElementById("catAddPanel");
+    if (catToggleBtn && catAddPanel) catToggleBtn.addEventListener("click", () => {
+      catAddPanel.style.display = catAddPanel.style.display === "none" ? "block" : "none";
+    });
+
+    const profileForm = document.getElementById("profileForm");
+    if (profileForm) profileForm.addEventListener("submit", saveProfile);
+
     els.importFile.addEventListener("change", (e) => {
       const f = e.target.files && e.target.files[0];
       if (f) importData(f);
@@ -521,9 +773,16 @@
     });
 
     els.txList.addEventListener("click", (e) => {
-      const btn = e.target.closest(".tx-del");
-      if (btn) deleteTransaction(btn.dataset.id);
+      const del = e.target.closest(".tx-del");
+      if (del) return deleteTransaction(del.dataset.id);
+      const ed = e.target.closest(".tx-edit");
+      if (ed) return openEdit(ed.dataset.id);
+      const rc = e.target.closest(".tx-receipt");
+      if (rc) return viewReceipt(rc.dataset.receipt);
     });
+
+    document.getElementById("editForm").addEventListener("submit", saveEdit);
+    document.getElementById("editCancel").addEventListener("click", closeEdit);
 
     render();
   }
