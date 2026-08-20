@@ -423,7 +423,7 @@
           <span class="tx-cat-dot" style="background:${color}"></span>
           <div class="tx-main">
             <div class="tx-title">${escapeHtml(t.category)}</div>
-            <div class="tx-sub">${t.note ? escapeHtml(t.note) : (isInc ? "Pendapatan" : "Perbelanjaan")} · ${ds}</div>
+            <div class="tx-sub">${t.note ? escapeHtml(t.note) : (isInc ? "Pendapatan" : "Perbelanjaan")} · ${t.date}</div>
           </div>
           <span class="tx-amt ${isInc ? "inc" : ""}">${amtTxt}</span>
           ${splitBadge}
