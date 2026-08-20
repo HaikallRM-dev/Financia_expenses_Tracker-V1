@@ -38,8 +38,11 @@
   let CATEGORIES = DEFAULT_CATEGORIES;
   let CAT_MAP = Object.fromEntries(CATEGORIES.map((c) => [c.name, c.color]));
 
-  const SUPABASE_TABLE = "Expenses"; // Jadual Supabase. Lajur: id(text PK), Title, Amount, Category, Date, note, created_at
-  const PROFILE_KEY = "fet_active_profile";
+  // A1: Supabase config (awak bagi URL + anon key)
+  const SUPABASE_URL = "https://knneeyyhewylmogdcwzz.supabase.co";
+  const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtubmVleXloZXd5bG1vZ2Rjd3p6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY4ODE2MjUsImV4cCI6MjEwMjQ1NzYyNX0.Jb2NtW8cd1gG1o3uJpJJCJQ7r5zsEKG83zgsrwHyDiA";
+  const SUPABASE_TABLE = "transactions"; // table yang awak buat (bukan Expenses lama)
+  let authMode = "login"; // "login" | "register"
   const CURRENCY_KEY = "fet_currency";
   const THEME_KEY = "fet_theme";
   const QR_KEY = "fet_qr";
@@ -187,28 +190,120 @@
 
   // ---- Cloud mapping (Supabase <-> app) ----
   function toRow(t) {
-    return {
+    const row = {
       id: t.id,
-      Title: t.note || t.category,
-      Amount: t.amount,
-      Category: t.category,
-      Date: t.date,
+      amount: t.amount,
+      category: t.category,
+      date: t.date,
       note: t.note || "",
+      type: t.type || "exp",
+      receipt: t.receipt || null,
+      split: t.split || null,
+      created_at: t.createdAt || Date.now(),
     };
+    const uid = getUserId();
+    if (uid) row.user_id = uid; // A3: attach user_id untuk RLS
+    return row;
   }
   function mapRow(item) {
     return {
       id: String(item.id),
-      amount: Number(item.Amount != null ? item.Amount : item.amount || 0),
-      category: item.Category || item.category || "Lain-lain",
-      date: item.Date || item.date || (item.created_at ? String(item.created_at).split("T")[0] : todayISO()),
-      note: item.note != null ? item.note : (item.Title || ""),
+      amount: Number(item.amount != null ? item.amount : 0),
+      category: item.category || "Lain-lain",
+      date: item.date || (item.created_at ? String(item.created_at).split("T")[0] : todayISO()),
+      note: item.note != null ? item.note : "",
+      type: item.type || "exp",
+      receipt: item.receipt || null,
+      split: item.split || null,
       createdAt: item.created_at ? new Date(item.created_at).getTime() : Date.now(),
     };
   }
 
   // ---- Cloud sync (best-effort) ----
   function sb() { return window.supabaseClient || null; }
+
+  // A1: init Supabase client
+  function initSupabase() {
+    if (!window.supabase || !window.supabase.createClient) return null;
+    try {
+      window.supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+      return window.supabaseClient;
+    } catch (e) { console.warn("Supabase init gagal:", e.message); return null; }
+  }
+
+  // A7: session persist + UI
+  function applyAuthUI(user) {
+    const lb = document.getElementById("logoutBtn");
+    const sb = document.getElementById("settingsBtn");
+    if (user) {
+      if (lb) lb.style.display = "inline-block";
+      if (sb) sb.title = "Tetapan (" + (user.email || "akaun") + ")";
+    } else {
+      if (lb) lb.style.display = "none";
+      if (sb) sb.title = "Tetapan";
+    }
+  }
+  function getUserId() {
+    const c = sb();
+    return c && c.auth && c.auth.currentUser ? c.auth.currentUser.id : null;
+  }
+
+  // A2/A5: auth handlers
+  async function handleAuth(e) {
+    e.preventDefault();
+    const email = document.getElementById("authEmail").value.trim();
+    const pass = document.getElementById("authPass").value;
+    const errBox = document.getElementById("authError");
+    if (errBox) errBox.textContent = "";
+    const client = sb();
+    if (!client) return showSnack("Supabase belum sedia.", false);
+    try {
+      let res;
+      if (authMode === "register") {
+        res = await client.auth.signUp({ email, password: pass });
+      } else {
+        res = await client.auth.signInWithPassword({ email, password: pass });
+      }
+      if (res.error) throw res.error;
+      // success: session disimpan auto oleh Supabase (localStorage)
+      const user = res.data.user || (res.data.session && res.data.session.user);
+      if (authMode === "register" && !res.data.session) {
+        if (errBox) errBox.textContent = "Daftar berjaya. Semak email untuk sahkan (jika diperlukan).";
+      }
+      document.getElementById("authModal").style.display = "none";
+      showSnack(authMode === "register" ? "Akaun dibuat." : "Log masuk berjaya.", true);
+      await onAuthChange(user);
+    } catch (err) {
+      if (errBox) errBox.textContent = err.message || "Ralat pengesahan.";
+    }
+  }
+  async function onAuthChange(user) {
+    applyAuthUI(user);
+    if (user) {
+      // A5: tukar ke data per-user
+      currentProfile = user.email || "User";
+      localStorage.setItem(PROFILE_KEY, currentProfile);
+      transactions = [];
+      loadLocal();          // baca cache lokal (key tetap)
+      await syncFromCloud(); // tarik data user dari Supabase
+      render();
+    } else {
+      currentProfile = localStorage.getItem(PROFILE_KEY) || "User";
+      loadLocal();
+      render();
+    }
+  }
+  function logout() {
+    const client = sb();
+    if (client && client.auth) client.auth.signOut();
+    document.getElementById("authModal").style.display = "none";
+    showSnack("Log keluar.", true);
+    onAuthChange(null);
+  }
+  function openAuth() {
+    document.getElementById("authError").textContent = "";
+    document.getElementById("authModal").style.display = "flex";
+  }
 
   async function syncFromCloud() {
     const client = sb();
@@ -927,7 +1022,38 @@
 
     loadData();
 
-    // Theme setup
+    // A1: init Supabase + session persist (A7)
+    const client = initSupabase();
+    if (client) {
+      client.auth.onAuthStateChange((_event, session) => {
+        const user = session && session.user ? session.user : null;
+        onAuthChange(user);
+      });
+      // restore UI jika dah login
+      const cur = client.auth.currentUser;
+      applyAuthUI(cur || null);
+    }
+
+    // A2: auth modal wiring
+    const authForm = document.getElementById("authForm");
+    if (authForm) authForm.addEventListener("submit", handleAuth);
+    const authToggle = document.getElementById("authToggle");
+    if (authToggle) authToggle.addEventListener("click", (e) => {
+      e.preventDefault();
+      authMode = authMode === "login" ? "register" : "login";
+      document.getElementById("authSubmit").textContent = authMode === "login" ? "Log Masuk" : "Daftar";
+      document.querySelector(".auth-toggle").firstChild.textContent = authMode === "login" ? "Tiada akaun? " : "Dah ada akaun? ";
+    });
+    const authCancel = document.getElementById("authCancel");
+    if (authCancel) authCancel.addEventListener("click", () => { document.getElementById("authModal").style.display = "none"; });
+    const logoutBtn = document.getElementById("logoutBtn");
+    if (logoutBtn) logoutBtn.addEventListener("click", logout);
+    // Settings modal: tukar "Tetapan" jadi buka auth jika belum login
+    if (settingsBtn) settingsBtn.addEventListener("click", () => {
+      const c = sb();
+      if (c && c.auth && c.auth.currentUser) openSettings();
+      else openAuth();
+    });
     const savedTheme = localStorage.getItem("fet_theme") || "dark";
     document.documentElement.setAttribute("data-theme", savedTheme);
 
@@ -940,9 +1066,7 @@
 
     if (els.profileChip) els.profileChip.addEventListener("click", openProfile);
 
-    // S4: Settings modal open/close/save
-    const settingsBtn = document.getElementById("settingsBtn");
-    if (settingsBtn) settingsBtn.addEventListener("click", openSettings);
+    // S4: Settings modal open/close/save handled above (auth-aware)
     const saveSettingsBtn = document.getElementById("saveSettingsBtn");
     if (saveSettingsBtn) saveSettingsBtn.addEventListener("click", saveSettings);
     const closeSettingsBtn = document.getElementById("closeSettingsBtn");

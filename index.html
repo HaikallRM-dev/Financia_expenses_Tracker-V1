@@ -25,6 +25,7 @@
       </div>
       <div class="topbar-actions">
         <button class="btn-ghost" id="settingsBtn" title="Tetapan">⚙️</button>
+        <button class="btn-ghost" id="logoutBtn" title="Log Keluar" style="display:none;">🚪 Logout</button>
       </div>
     </header>
 
@@ -264,6 +265,23 @@
         <button type="button" class="btn-ghost" id="closeSettingsBtn">Tutup</button>
         <button type="button" class="btn-primary" id="saveSettingsBtn">Simpan</button>
       </div>
+    </div>
+  </div>
+
+  <!-- A2: Login / Register Modal -->
+  <div class="modal-overlay" id="authModal" style="display:none;">
+    <div class="modal-box">
+      <h3>🔐 Log Masuk / Daftar</h3>
+      <form id="authForm" class="form" autocomplete="off">
+        <label class="field full"><span>Email</span><input type="email" id="authEmail" required placeholder="anda@email.com" /></label>
+        <label class="field full"><span>Kata Laluan</span><input type="password" id="authPass" required minlength="6" placeholder="••••••" /></label>
+        <div id="authError" class="auth-error"></div>
+        <div class="modal-actions">
+          <button type="button" class="btn-ghost" id="authCancel">Batal</button>
+          <button type="submit" class="btn-primary" id="authSubmit">Log Masuk</button>
+        </div>
+      </form>
+      <p class="auth-toggle">Tiada akaun? <a href="#" id="authToggle">Daftar di sini</a></p>
     </div>
   </div>
 
