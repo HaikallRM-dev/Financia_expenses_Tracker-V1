@@ -24,12 +24,7 @@
         </div>
       </div>
       <div class="topbar-actions">
-        <button class="btn-ghost" id="themeToggle" title="Tukar Mod Cerah / Gelap">🌓 Tema</button>
         <button class="btn-ghost" id="settingsBtn" title="Tetapan">⚙️</button>
-        <div class="profile-chip" id="profileChip" title="Tukar profil / Ahli Keluarga">
-          <span id="profileInitial">U</span>
-          <span id="profileName">User</span>
-        </div>
       </div>
     </header>
 
@@ -46,8 +41,8 @@
         <span class="card-meta" id="monthRange">—</span>
       </div>
       <div class="card">
-        <span class="card-label">Jumlah Transaksi</span>
-        <span class="card-value sm" id="allCount">0 transaksi direkod</span>
+        <span class="card-label">Semua Transaksi</span>
+        <span class="card-value sm" id="allCount">0</span>
         <span class="card-meta" id="monthCount">0 bulan ini</span>
       </div>
       <div class="card">
@@ -73,12 +68,6 @@
         </div>
 
         <form id="expenseForm" class="form" autocomplete="off">
-          <!-- F1: Quick-add bar (minimalis: jumlah + kategori + Add) -->
-          <div class="quick-add">
-            <input type="number" id="qaAmount" step="0.01" min="0.01" placeholder="0.00" aria-label="Jumlah" />
-            <select id="qaCategory" aria-label="Kategori"></select>
-            <button type="button" class="btn-primary qa-add" id="qaAddBtn">+ Add</button>
-          </div>
           <div class="field full">
             <span>Jenis</span>
             <div class="type-toggle">

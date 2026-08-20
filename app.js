@@ -83,9 +83,6 @@
     prevMonth: $("prevMonth"),
     nextMonth: $("nextMonth"),
     allToggle: $("allToggle"),
-    profileChip: $("profileChip"),
-    profileInitial: $("profileInitial"),
-    profileName: $("profileName"),
     exportCsvBtn: $("exportCsvBtn"),
     exportJsonBtn: $("exportJsonBtn"),
     importBtn: $("importBtn"),
@@ -95,7 +92,6 @@
     budgetFig: $("budgetFig"),
     budgetFill: $("budgetFill"),
     budgetMsg: $("budgetMsg"),
-    themeToggle: $("themeToggle"),
     receiptInput: $("receiptInput"),
   };
 
@@ -264,7 +260,8 @@
     els.monthRange.textContent = monthName(viewMonth);
 
     els.allTotal.textContent = fmtRM(aTotal);
-    els.allCount.textContent = transactions.length + " transaksi direkod";
+    els.allCount.textContent = transactions.length; // nombor besar (card "Jumlah Transaksi")
+    els.monthCount.textContent = monthTx.length + " bulan ini";
 
     // Phase 6: balance (income - expense)
     const incTotal = transactions.filter((t) => t.type === "inc").reduce((s, t) => s + t.amount, 0);
@@ -357,8 +354,8 @@
   }
 
   function renderProfile() {
-    els.profileName.textContent = currentProfile;
-    els.profileInitial.textContent = currentProfile.charAt(0).toUpperCase();
+    if (els.profileName) els.profileName.textContent = currentProfile;
+    if (els.profileInitial) els.profileInitial.textContent = currentProfile.charAt(0).toUpperCase();
   }
 
   // Phase 9: Monthly Comparison card
@@ -552,32 +549,6 @@
   }
 
   // F1: Quick-add minimalis (jumlah + kategori + tap Add, tarikh hari ini)
-  function quickAdd() {
-    const amount = parseFloat(document.getElementById("qaAmount").value);
-    const category = document.getElementById("qaCategory").value;
-    if (!(amount > 0)) return showSnack("Sila masukkan jumlah sah.", false);
-    if (!category) return showSnack("Sila pilih kategori.", false);
-    const date = todayISO();
-    const tx = {
-      id: genId(),
-      amount: Math.round(amount * 100) / 100,
-      category,
-      date,
-      note: "",
-      type: "exp",
-      receipt: null,
-      createdAt: Date.now(),
-    };
-    transactions.push(tx);
-    save();
-    viewMonth = monthKey(new Date(date));
-    showAll = false;
-    document.getElementById("qaAmount").value = "";
-    render();
-    showSnack("Ditambah RM" + tx.amount.toFixed(2), true);
-    pushToCloud(tx);
-  }
-
   async function deleteTransaction(id) {
     const before = transactions.length;
     transactions = transactions.filter((t) => t.id !== id);
@@ -909,8 +880,6 @@
     CATEGORIES = getCategories();
     CAT_MAP = getCatMap();
     els.category.innerHTML = CATEGORIES.map((c) => `<option value="${c.name}">${c.name}</option>`).join("");
-    const qa = document.getElementById("qaCategory");
-    if (qa) qa.innerHTML = CATEGORIES.map((c) => `<option value="${c.name}">${c.name}</option>`).join("");
   }
   function addCategory() {
     const name = document.getElementById("newCatName").value.trim();
@@ -936,8 +905,6 @@
   async function init() {
     refreshCategories();
     els.date.value = todayISO();
-    const qaBtn = document.getElementById("qaAddBtn");
-    if (qaBtn) qaBtn.addEventListener("click", quickAdd);
 
     loadData();
 
@@ -945,14 +912,14 @@
     const savedTheme = localStorage.getItem("fet_theme") || "dark";
     document.documentElement.setAttribute("data-theme", savedTheme);
 
-    els.themeToggle.addEventListener("click", () => {
+    if (els.themeToggle) els.themeToggle.addEventListener("click", () => {
       const current = document.documentElement.getAttribute("data-theme");
       const next = current === "dark" ? "light" : "dark";
       document.documentElement.setAttribute("data-theme", next);
       localStorage.setItem("fet_theme", next);
     });
 
-    els.profileChip.addEventListener("click", openProfile);
+    if (els.profileChip) els.profileChip.addEventListener("click", openProfile);
 
     // S4: Settings modal open/close/save
     const settingsBtn = document.getElementById("settingsBtn");

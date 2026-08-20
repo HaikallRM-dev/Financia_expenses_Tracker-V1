@@ -38,7 +38,7 @@ body {
   transition: background 0.3s, color 0.3s;
 }
 
-.app { max-width: 1080px; margin: 0 auto; padding: 28px 20px 60px; }
+.app { max-width: 1080px; margin: 0 auto; padding: 28px 20px calc(40px + env(safe-area-inset-bottom)); }
 
 /* Topbar */
 .topbar {
@@ -203,9 +203,25 @@ body {
 .budget-set input { width: 100px; background: var(--bg-2); border: 1px solid var(--border); color: var(--text); border-radius: 9px; padding: 7px 10px; font-size: 13px; outline: none; }
 
 @media (max-width: 760px) {
-  .cards { grid-template-columns: 1fr; }
+  .app { padding: 14px 12px calc(28px + env(safe-area-inset-bottom)); }
+  .cards { grid-template-columns: 1fr; gap: 12px; }
   .grid { grid-template-columns: 1fr; }
-  .form { grid-template-columns: 1fr; }
+  .form { grid-template-columns: 1fr; gap: 12px; }
+  /* Big touch targets for inputs on phone */
+  .field input, .field select { font-size: 16px; padding: 14px 14px; min-height: 50px; }
+  .btn-primary { min-height: 50px; font-size: 16px; }
+  .btn-ghost { min-height: 44px; }
+  /* Type toggle as big buttons */
+  .type-toggle { display: flex; gap: 10px; }
+  .type-toggle label {
+    flex: 1; justify-content: center; min-height: 50px; font-size: 15px;
+    border: 1px solid var(--border); border-radius: 12px;
+  }
+  .type-toggle input { width: 18px; height: 18px; }
+  /* Metric card cleanup: hide redundant meta on phone */
+  .card-meta { font-size: 12px; }
+  /* Split add row */
+  .split-add-row input { min-height: 46px; font-size: 15px; }
 }
 
 /* ===== Phase 2: Category Filter Chips ===== */
@@ -294,48 +310,11 @@ body {
 .compare-delta.warn { color: var(--danger); font-weight: 600; }
 .compare-delta.good { color: var(--emerald-2); font-weight: 600; }
 
-/* ===== F1: Quick-add bar (minimalis) ===== */
-.quick-add {
-  grid-column: 1 / -1;
-  display: flex;
-  gap: 8px;
-  margin-bottom: 12px;
-  align-items: stretch;
-  box-sizing: border-box;
-}
-.quick-add input[type="number"] {
-  flex: 1 1 90px;
-  min-width: 0;
-  background: var(--bg-2);
-  border: 1px solid var(--border);
-  color: var(--text);
-  border-radius: 10px;
-  padding: 12px 10px;
-  font-size: 15px;
-}
-.quick-add select {
-  flex: 1 1 110px;
-  min-width: 0;
-  background: var(--bg-2);
-  border: 1px solid var(--border);
-  color: var(--text);
-  border-radius: 10px;
-  padding: 12px 10px;
-  font-size: 15px;
-}
-.quick-add .qa-add {
-  flex: 0 0 auto;
-  white-space: nowrap;
-  padding: 12px 16px;
-  font-weight: 600;
-}
-.quick-add input:focus,
-.quick-add select:focus {
-  outline: 2px solid var(--accent);
-  border-color: var(--accent);
-}
 
-/* ===== F2: Clean list ("you spent RM X") ===== */
+/* ===== Phase 3: Edit Modal ===== */
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(2,8,6,0.6);
+}
 .tx-line {
   display: flex;
   align-items: center;
