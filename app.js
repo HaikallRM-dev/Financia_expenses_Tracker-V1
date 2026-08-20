@@ -59,9 +59,11 @@
     return sym + " " + Number(n).toLocaleString("ms-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
 
-  // ---- Storage keys (per-profile) ----
-  const TX_KEY = () => "fet_transactions_" + currentProfile;
-  const BUDGET_KEY = () => "fet_budgets_" + currentProfile;
+  // ---- Storage keys ----
+  // SEBELUM Login (Group A): guna key TETAP (single local profile).
+  // Bila Login siap, data akan dipisah guna user_id dari Supabase, bukan currentProfile.
+  const TX_KEY = () => "fet_transactions";
+  const BUDGET_KEY = () => "fet_budgets";
 
   const $ = (id) => document.getElementById(id);
   const els = {
@@ -164,6 +166,23 @@
       }
       localStorage.removeItem(LEGACY_KEY);
     } catch { /* abaikan blob lama rosak */ }
+    // V1.4 FIX: pindah data dari key per-profile (fet_transactions_User dll) ke key tetap
+    const OLD_PROFILES = ["User", "Default"];
+    let migrated = 0;
+    OLD_PROFILES.forEach((p) => {
+      const raw = localStorage.getItem("fet_transactions_" + p);
+      if (!raw) return;
+      try {
+        const arr = JSON.parse(raw);
+        if (Array.isArray(arr) && arr.length) {
+          const map = new Map(transactions.map((t) => [t.id, t]));
+          arr.forEach((t) => { if (t && t.id && !map.has(t.id)) { map.set(t.id, t); migrated++; } });
+          transactions = [...map.values()];
+        }
+      } catch (e) { /* abaikan */ }
+      localStorage.removeItem("fet_transactions_" + p);
+    });
+    if (migrated) { save(); showSnack("Data dipulihkan: " + migrated + " rekod.", true); }
   }
 
   // ---- Cloud mapping (Supabase <-> app) ----
