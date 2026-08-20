@@ -1022,38 +1022,7 @@
 
     loadData();
 
-    // A1: init Supabase + session persist (A7)
-    const client = initSupabase();
-    if (client) {
-      client.auth.onAuthStateChange((_event, session) => {
-        const user = session && session.user ? session.user : null;
-        onAuthChange(user);
-      });
-      // restore UI jika dah login
-      const cur = client.auth.currentUser;
-      applyAuthUI(cur || null);
-    }
-
-    // A2: auth modal wiring
-    const authForm = document.getElementById("authForm");
-    if (authForm) authForm.addEventListener("submit", handleAuth);
-    const authToggle = document.getElementById("authToggle");
-    if (authToggle) authToggle.addEventListener("click", (e) => {
-      e.preventDefault();
-      authMode = authMode === "login" ? "register" : "login";
-      document.getElementById("authSubmit").textContent = authMode === "login" ? "Log Masuk" : "Daftar";
-      document.querySelector(".auth-toggle").firstChild.textContent = authMode === "login" ? "Tiada akaun? " : "Dah ada akaun? ";
-    });
-    const authCancel = document.getElementById("authCancel");
-    if (authCancel) authCancel.addEventListener("click", () => { document.getElementById("authModal").style.display = "none"; });
-    const logoutBtn = document.getElementById("logoutBtn");
-    if (logoutBtn) logoutBtn.addEventListener("click", logout);
-    // Settings modal: tukar "Tetapan" jadi buka auth jika belum login
-    if (settingsBtn) settingsBtn.addEventListener("click", () => {
-      const c = sb();
-      if (c && c.auth && c.auth.currentUser) openSettings();
-      else openAuth();
-    });
+    // Theme setup (asal, tak bergantung Supabase)
     const savedTheme = localStorage.getItem("fet_theme") || "dark";
     document.documentElement.setAttribute("data-theme", savedTheme);
 
@@ -1066,7 +1035,12 @@
 
     if (els.profileChip) els.profileChip.addEventListener("click", openProfile);
 
-    // S4: Settings modal open/close/save handled above (auth-aware)
+    // S4: Settings modal (auth-aware: buka login jika belum login)
+    if (settingsBtn) settingsBtn.addEventListener("click", () => {
+      const c = sb();
+      if (c && c.auth && c.auth.currentUser) openSettings();
+      else openAuth();
+    });
     const saveSettingsBtn = document.getElementById("saveSettingsBtn");
     if (saveSettingsBtn) saveSettingsBtn.addEventListener("click", saveSettings);
     const closeSettingsBtn = document.getElementById("closeSettingsBtn");
@@ -1176,7 +1150,42 @@
     document.getElementById("editForm").addEventListener("submit", saveEdit);
     document.getElementById("editCancel").addEventListener("click", closeEdit);
 
+    // P0 FIX: Supabase init LAST + try/catch — app jalan walaupun Supabase gagal
+    setupAuth();
+
     render();
+  }
+
+  // P0: auth setup dipisah, tak block UI listeners
+  function setupAuth() {
+    try {
+      const client = initSupabase();
+      if (!client) return;
+      client.auth.onAuthStateChange((_event, session) => {
+        const user = session && session.user ? session.user : null;
+        onAuthChange(user);
+      });
+      const cur = client.auth.currentUser;
+      applyAuthUI(cur || null);
+      // A2: auth modal wiring
+      const authForm = document.getElementById("authForm");
+      if (authForm) authForm.addEventListener("submit", handleAuth);
+      const authToggle = document.getElementById("authToggle");
+      if (authToggle) authToggle.addEventListener("click", (e) => {
+        e.preventDefault();
+        authMode = authMode === "login" ? "register" : "login";
+        const sub = document.getElementById("authSubmit");
+        if (sub) sub.textContent = authMode === "login" ? "Log Masuk" : "Daftar";
+        const tog = document.querySelector(".auth-toggle");
+        if (tog) tog.firstChild.textContent = authMode === "login" ? "Tiada akaun? " : "Dah ada akaun? ";
+      });
+      const authCancel = document.getElementById("authCancel");
+      if (authCancel) authCancel.addEventListener("click", () => { document.getElementById("authModal").style.display = "none"; });
+      const logoutBtn = document.getElementById("logoutBtn");
+      if (logoutBtn) logoutBtn.addEventListener("click", logout);
+    } catch (e) {
+      console.warn("Auth setup dilewati (Supabase gagal):", e.message);
+    }
   }
 
   document.addEventListener("DOMContentLoaded", init);
