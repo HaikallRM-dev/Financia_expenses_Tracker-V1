@@ -40,7 +40,24 @@
 
   const SUPABASE_TABLE = "Expenses"; // Jadual Supabase. Lajur: id(text PK), Title, Amount, Category, Date, note, created_at
   const PROFILE_KEY = "fet_active_profile";
+  const CURRENCY_KEY = "fet_currency";
+  const THEME_KEY = "fet_theme";
+  const QR_KEY = "fet_qr";
+  const REMIND_KEY = "fet_reminders";
   const LEGACY_KEY = "fet_transactions"; // Kunci lama (v1.1) untuk migration
+
+  // Q1: QR DuitNow (base64)
+  let userQR = localStorage.getItem(QR_KEY) || "";
+  let reminders = [];
+  try { reminders = JSON.parse(localStorage.getItem(REMIND_KEY) || "[]"); } catch (e) { reminders = []; }
+
+  // S6: Currency formatter (dynamic)
+  let CURRENCY = localStorage.getItem(CURRENCY_KEY) || "RM";
+  const CURRENCY_SYMBOL = { RM: "RM", USD: "$", SGD: "S$", IDR: "Rp" };
+  function fmtRM(n) {
+    const sym = CURRENCY_SYMBOL[CURRENCY] || "RM";
+    return sym + " " + Number(n).toLocaleString("ms-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
 
   // ---- Storage keys (per-profile) ----
   const TX_KEY = () => "fet_transactions_" + currentProfile;
@@ -84,9 +101,6 @@
 
   function monthKey(d) {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-  }
-  function fmtRM(n) {
-    return "RM " + Number(n).toLocaleString("ms-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
   function monthName(ym) {
     const [y, m] = ym.split("-").map(Number);
@@ -291,18 +305,17 @@
       els.txList.innerHTML = sorted.map((t) => {
         const color = CAT_MAP[t.category] || "#9a9aa5";
         const isInc = t.type === "inc";
-        const ds = new Date(t.date).toLocaleDateString("ms-MY", { day: "numeric", month: "short", year: "numeric" });
-        const amtTxt = (isInc ? "+" : "−") + fmtRM(t.amount).replace("RM ", "");
-        return `<div class="tx ${isInc ? "inc" : ""}">
-          <span class="tx-dot" style="background:${color}"></span>
+        const amtTxt = fmtRM(t.amount);
+        const splitBadge = t.split && t.split.members.length ? `<button class="tx-split" data-split="${t.id}" title="Belah bil">🤝 ${t.split.members.length}</button>` : "";
+        return `<div class="tx-line">
+          <span class="tx-cat-dot" style="background:${color}"></span>
           <div class="tx-main">
-            <div class="tx-cat">${escapeHtml(t.category)} ${isInc ? "💰" : ""}</div>
-            <div class="tx-note">${t.note ? escapeHtml(t.note) : ds}</div>
+            <div class="tx-title">${escapeHtml(t.category)}</div>
+            <div class="tx-sub">${t.note ? escapeHtml(t.note) : (isInc ? "Pendapatan" : "Perbelanjaan")} · ${ds}</div>
           </div>
-          <div class="tx-right">
-            <span class="tx-amt ${isInc ? "inc-amt" : ""}">${amtTxt}</span>
-            <span class="tx-date">${ds}</span>
-          </div>
+          <span class="tx-amt ${isInc ? "inc" : ""}">${amtTxt}</span>
+          ${splitBadge}
+          ${t.split && t.split.members.length ? `<button class="tx-share" data-share="${t.id}" title="Kongsi bil">📤</button>` : ""}
           ${t.receipt ? `<button class="tx-receipt" data-receipt="${t.id}" title="Lihat resit">📸</button>` : ""}
           <button class="tx-edit" data-id="${t.id}" title="Edit">✏️</button>
           <button class="tx-del" data-id="${t.id}" title="Padam">✕</button>
@@ -479,6 +492,9 @@
 
     if (!(amount > 0)) return showSnack("Sila masukkan jumlah sah.", false);
 
+    // D (Split Bill): baca ahli jika split diaktifkan
+    const split = readSplit(amount);
+
     const tx = {
       id: genId(),
       amount: Math.round(amount * 100) / 100,
@@ -487,6 +503,7 @@
       note,
       type,
       receipt: pendingReceipt, // Phase 7: base64 receipt image (may be null)
+      split, // D5: { members:[...], perPerson } atau null
       createdAt: Date.now(),
     };
     transactions.push(tx);
@@ -496,8 +513,68 @@
     els.form.reset();
     els.date.value = todayISO();
     clearPendingReceipt(); // Phase 7: reset receipt after add
+    resetSplitUI(); // D: reset split selepas add
     render();
-    showSnack("Rekod ditambah (disimpan secara lokal).", true);
+    showSnack("Rekod ditambah (disimpan secara lokal)." + (split ? " · Belah " + split.members.length : ""), true);
+    pushToCloud(tx);
+  }
+
+  // D (Split Bill) — baca ahli dari UI
+  let splitMembers = []; // array nama (D2)
+  function readSplit(amount) {
+    const on = document.getElementById("splitOn") && document.getElementById("splitOn").checked;
+    if (!on || splitMembers.length < 2) return null; // D3: perlu >=2 orang
+    const per = Math.round((amount / splitMembers.length) * 100) / 100;
+    return { members: splitMembers.slice(), perPerson: per };
+  }
+  function renderSplitMembers() {
+    const list = document.getElementById("splitMemberList");
+    if (!list) return;
+    list.innerHTML = splitMembers.map((m, i) =>
+      `<span class="split-chip">${escapeHtml(m)} <button type="button" class="split-x" data-i="${i}" title="Buang">✕</button></span>`
+    ).join("");
+    const info = document.getElementById("splitInfo");
+    const amt = parseFloat(els.amount.value);
+    if (info && splitMembers.length >= 2 && amount > 0) {
+      const per = (amt / splitMembers.length).toFixed(2);
+      info.textContent = `RM${per} seorang (${splitMembers.length} orang)`;
+    } else if (info) {
+      info.textContent = splitMembers.length < 2 ? "Tambah sekurang-kurang 2 nama." : "";
+    }
+  }
+  function resetSplitUI() {
+    splitMembers = [];
+    const box = document.getElementById("splitMembers");
+    const on = document.getElementById("splitOn");
+    if (box) box.style.display = "none";
+    if (on) on.checked = false;
+    renderSplitMembers();
+  }
+
+  // F1: Quick-add minimalis (jumlah + kategori + tap Add, tarikh hari ini)
+  function quickAdd() {
+    const amount = parseFloat(document.getElementById("qaAmount").value);
+    const category = document.getElementById("qaCategory").value;
+    if (!(amount > 0)) return showSnack("Sila masukkan jumlah sah.", false);
+    if (!category) return showSnack("Sila pilih kategori.", false);
+    const date = todayISO();
+    const tx = {
+      id: genId(),
+      amount: Math.round(amount * 100) / 100,
+      category,
+      date,
+      note: "",
+      type: "exp",
+      receipt: null,
+      createdAt: Date.now(),
+    };
+    transactions.push(tx);
+    save();
+    viewMonth = monthKey(new Date(date));
+    showAll = false;
+    document.getElementById("qaAmount").value = "";
+    render();
+    showSnack("Ditambah RM" + tx.amount.toFixed(2), true);
     pushToCloud(tx);
   }
 
@@ -603,6 +680,142 @@
   function closeProfile() {
     document.getElementById("profileModal").style.display = "none";
   }
+
+  // ===== S4/S6/S7/S8: Settings =====
+  function openSettings() {
+    const nm = document.getElementById("setProfileName");
+    const cur = document.getElementById("setCurrency");
+    const th = document.getElementById("setTheme");
+    if (nm) nm.value = currentProfile === "User" ? "" : currentProfile;
+    if (cur) cur.value = CURRENCY;
+    if (th) th.value = localStorage.getItem(THEME_KEY) || "dark";
+    document.getElementById("settingsModal").style.display = "flex";
+  }
+  function closeSettings() {
+    document.getElementById("settingsModal").style.display = "none";
+  }
+  function saveSettings() {
+    const nm = document.getElementById("setProfileName");
+    const cur = document.getElementById("setCurrency");
+    const th = document.getElementById("setTheme");
+    const name = (nm && nm.value.trim()) || currentProfile;
+    const currency = cur ? cur.value : "RM";
+    const theme = th ? th.value : "dark";
+    // S5: profile name (local) — sync device bila Login siap
+    currentProfile = name.slice(0, 24);
+    localStorage.setItem(PROFILE_KEY, currentProfile);
+    // S6: currency
+    CURRENCY = currency;
+    localStorage.setItem(CURRENCY_KEY, currency);
+    // S7: theme
+    localStorage.setItem(THEME_KEY, theme);
+    applyTheme(theme);
+    // Q1: QR DuitNow (dari temporary buffer)
+    localStorage.setItem(QR_KEY, pendingQR || "");
+    userQR = pendingQR || "";
+    loadData();
+    refreshCategories();
+    render();
+    renderReminders();
+    closeSettings();
+    showSnack("Tetapan disimpan (" + currency + ").", true);
+  }
+  function applyTheme(theme) {
+    if (theme === "auto") { applyThemeAuto(); return; }
+    document.documentElement.setAttribute("data-theme", theme);
+  }
+  function applyThemeAuto() {
+    if ((localStorage.getItem(THEME_KEY) || "dark") !== "auto") return;
+    const mq = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)");
+    const sys = mq && mq.matches ? "dark" : "light";
+    document.documentElement.setAttribute("data-theme", sys);
+  }
+
+  // ===== Q1: QR DuitNow =====
+  let pendingQR = ""; // buffer semasa pilih file
+  function handleQrFile(file) {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      pendingQR = e.target.result;
+      const prev = document.getElementById("setQrPreview");
+      const rm = document.getElementById("setQrRemove");
+      if (prev) { prev.src = pendingQR; prev.style.display = "block"; }
+      if (rm) rm.style.display = "inline-block";
+    };
+    reader.readAsDataURL(file);
+  }
+  function removeQr() {
+    pendingQR = "";
+    const prev = document.getElementById("setQrPreview");
+    const rm = document.getElementById("setQrRemove");
+    const inp = document.getElementById("setQrFile");
+    if (prev) { prev.src = ""; prev.style.display = "none"; }
+    if (rm) rm.style.display = "none";
+    if (inp) inp.value = "";
+  }
+
+  // ===== Q2/Q3: Share Bill + Reminder =====
+  function openShare(id) {
+    const t = transactions.find((x) => x.id === id);
+    if (!t) return;
+    const body = document.getElementById("shareBody");
+    let html = `<div class="share-line"><b>${escapeHtml(t.category)}</b> · ${fmtRM(t.amount)}</div>`;
+    if (t.split && t.split.members.length) {
+      html += `<div class="share-line">Belah ${t.split.members.length} orang (${fmtRM(t.split.perPerson)} seorang):</div>`;
+      html += t.split.members.map((m) => `<div class="share-line">• ${escapeHtml(m)}: ${fmtRM(t.split.perPerson)}</div>`).join("");
+    }
+    if (body) body.innerHTML = html;
+    // QR jika ada
+    const wrap = document.getElementById("shareQrWrap");
+    const img = document.getElementById("shareQrImg");
+    if (userQR && wrap && img) { img.src = userQR; wrap.style.display = "block"; }
+    else if (wrap) wrap.style.display = "none";
+    // reminder checkbox reset
+    const rem = document.getElementById("shareRemindOn");
+    if (rem) rem.checked = reminders.some((r) => r.id === id);
+    document.getElementById("shareModal").style.display = "flex";
+    // simpan id semasa untuk copy/remind
+    shareCurrentId = id;
+  }
+  function closeShare() {
+    document.getElementById("shareModal").style.display = "none";
+  }
+  function copyShareText() {
+    const t = transactions.find((x) => x.id === shareCurrentId);
+    if (!t) return;
+    let txt = `Bil ${t.category} ${fmtRM(t.amount)}`;
+    if (t.split && t.split.members.length) {
+      txt += `\nBelah ${t.split.members.length} orang (${fmtRM(t.split.perPerson)} seorang):\n` +
+        t.split.members.map((m) => "- " + m + ": " + fmtRM(t.split.perPerson)).join("\n");
+    }
+    if (navigator.clipboard) navigator.clipboard.writeText(txt).then(() => showSnack("Teks disalin.", true));
+    else showSnack("Salin tak disokong.", false);
+  }
+  function toggleReminder() {
+    const rem = document.getElementById("shareRemindOn");
+    if (!rem || !shareCurrentId) return;
+    if (rem.checked) {
+      if (!reminders.some((r) => r.id === shareCurrentId)) {
+        const t = transactions.find((x) => x.id === shareCurrentId);
+        reminders.push({ id: shareCurrentId, label: t ? t.category : "Bil", amount: t ? t.amount : 0 });
+        showSnack("Peringatan ditambah.", true);
+      }
+    } else {
+      reminders = reminders.filter((r) => r.id !== shareCurrentId);
+    }
+    localStorage.setItem(REMIND_KEY, JSON.stringify(reminders));
+    renderReminders();
+  }
+  function renderReminders() {
+    const box = document.getElementById("reminderBox");
+    if (!box) return;
+    if (!reminders.length) { box.style.display = "none"; return; }
+    box.style.display = "block";
+    box.innerHTML = `<div class="reminder-title">🔔 Belum dihantar (${reminders.length})</div>` +
+      reminders.map((r) => `<div class="reminder-item">• ${escapeHtml(r.label)} ${fmtRM(r.amount)} <button type="button" class="reminder-x" data-rid="${r.id}">✕</button></div>`).join("");
+  }
+  let shareCurrentId = null;
   function saveProfile(e) {
     e.preventDefault();
     const inp = document.getElementById("profileNameInput");
@@ -636,6 +849,12 @@
     pendingReceipt = null;
     const prev = document.getElementById("receiptThumb");
     if (prev) { prev.src = ""; prev.style.display = "none"; }
+  }
+  function showSplitBreakdown(id) {
+    const t = transactions.find((x) => x.id === id);
+    if (!t || !t.split) return;
+    const lines = t.split.members.map((m) => "• " + m + ": " + fmtRM(t.split.perPerson)).join("\n");
+    alert("Belah bil — " + t.category + " " + fmtRM(t.amount) + "\n" + t.split.members.length + " orang\n\n" + lines);
   }
   function viewReceipt(id) {
     const t = transactions.find((x) => x.id === id);
@@ -690,6 +909,8 @@
     CATEGORIES = getCategories();
     CAT_MAP = getCatMap();
     els.category.innerHTML = CATEGORIES.map((c) => `<option value="${c.name}">${c.name}</option>`).join("");
+    const qa = document.getElementById("qaCategory");
+    if (qa) qa.innerHTML = CATEGORIES.map((c) => `<option value="${c.name}">${c.name}</option>`).join("");
   }
   function addCategory() {
     const name = document.getElementById("newCatName").value.trim();
@@ -715,6 +936,8 @@
   async function init() {
     refreshCategories();
     els.date.value = todayISO();
+    const qaBtn = document.getElementById("qaAddBtn");
+    if (qaBtn) qaBtn.addEventListener("click", quickAdd);
 
     loadData();
 
@@ -730,6 +953,61 @@
     });
 
     els.profileChip.addEventListener("click", openProfile);
+
+    // S4: Settings modal open/close/save
+    const settingsBtn = document.getElementById("settingsBtn");
+    if (settingsBtn) settingsBtn.addEventListener("click", openSettings);
+    const saveSettingsBtn = document.getElementById("saveSettingsBtn");
+    if (saveSettingsBtn) saveSettingsBtn.addEventListener("click", saveSettings);
+    const closeSettingsBtn = document.getElementById("closeSettingsBtn");
+    if (closeSettingsBtn) closeSettingsBtn.addEventListener("click", closeSettings);
+    applyThemeAuto(); // S7: system theme on load if "auto"
+
+    // Q1: QR file handlers
+    const qrFile = document.getElementById("setQrFile");
+    if (qrFile) qrFile.addEventListener("change", (e) => handleQrFile(e.target.files[0]));
+    const qrRemove = document.getElementById("setQrRemove");
+    if (qrRemove) qrRemove.addEventListener("click", removeQr);
+
+    // Q2/Q3: Share + reminder
+    const shareCopyBtn = document.getElementById("shareCopyBtn");
+    if (shareCopyBtn) shareCopyBtn.addEventListener("click", copyShareText);
+    const shareRemindOn = document.getElementById("shareRemindOn");
+    if (shareRemindOn) shareRemindOn.addEventListener("change", toggleReminder);
+    const reminderBox = document.getElementById("reminderBox");
+    if (reminderBox) reminderBox.addEventListener("click", (e) => {
+      const x = e.target.closest(".reminder-x");
+      if (x) { reminders = reminders.filter((r) => r.id !== x.dataset.rid); localStorage.setItem(REMIND_KEY, JSON.stringify(reminders)); renderReminders(); }
+    });
+    renderReminders();
+
+    // D (Split Bill) wiring
+    const splitOn = document.getElementById("splitOn");
+    if (splitOn) splitOn.addEventListener("change", () => {
+      const box = document.getElementById("splitMembers");
+      if (box) box.style.display = splitOn.checked ? "block" : "none";
+      if (splitOn.checked && splitMembers.length === 0) {
+        const me = (localStorage.getItem(PROFILE_KEY) || "Saya");
+        splitMembers.push(me === "User" ? "Saya" : me);
+        renderSplitMembers();
+      }
+    });
+    const splitAddBtn = document.getElementById("splitAddBtn");
+    if (splitAddBtn) splitAddBtn.addEventListener("click", () => {
+      const inp = document.getElementById("splitNewName");
+      const nm = inp && inp.value.trim();
+      if (!nm) return;
+      if (splitMembers.includes(nm)) return showSnack("Nama dah wujud.", false);
+      splitMembers.push(nm.slice(0, 20));
+      if (inp) inp.value = "";
+      renderSplitMembers();
+    });
+    const memberList = document.getElementById("splitMemberList");
+    if (memberList) memberList.addEventListener("click", (e) => {
+      const x = e.target.closest(".split-x");
+      if (x) { splitMembers.splice(Number(x.dataset.i), 1); renderSplitMembers(); }
+    });
+    els.amount.addEventListener("input", renderSplitMembers);
 
     document.getElementById("addCatBtn").addEventListener("click", addCategory);
 
@@ -779,6 +1057,10 @@
       if (ed) return openEdit(ed.dataset.id);
       const rc = e.target.closest(".tx-receipt");
       if (rc) return viewReceipt(rc.dataset.receipt);
+      const sp = e.target.closest(".tx-split");
+      if (sp) return showSplitBreakdown(sp.dataset.split);
+      const sh = e.target.closest(".tx-share");
+      if (sh) return openShare(sh.dataset.share);
     });
 
     document.getElementById("editForm").addEventListener("submit", saveEdit);

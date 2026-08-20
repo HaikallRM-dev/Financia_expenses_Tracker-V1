@@ -25,6 +25,7 @@
       </div>
       <div class="topbar-actions">
         <button class="btn-ghost" id="themeToggle" title="Tukar Mod Cerah / Gelap">🌓 Tema</button>
+        <button class="btn-ghost" id="settingsBtn" title="Tetapan">⚙️</button>
         <div class="profile-chip" id="profileChip" title="Tukar profil / Ahli Keluarga">
           <span id="profileInitial">U</span>
           <span id="profileName">User</span>
@@ -72,6 +73,12 @@
         </div>
 
         <form id="expenseForm" class="form" autocomplete="off">
+          <!-- F1: Quick-add bar (minimalis: jumlah + kategori + Add) -->
+          <div class="quick-add">
+            <input type="number" id="qaAmount" step="0.01" min="0.01" placeholder="0.00" aria-label="Jumlah" />
+            <select id="qaCategory" aria-label="Kategori"></select>
+            <button type="button" class="btn-primary qa-add" id="qaAddBtn">+ Add</button>
+          </div>
           <div class="field full">
             <span>Jenis</span>
             <div class="type-toggle">
@@ -95,6 +102,21 @@
             <span>Nota (pilihan)</span>
             <input type="text" id="note" maxlength="80" placeholder="Contoh: Makan tengah hari" />
           </label>
+
+          <!-- D (Split Bill) -->
+          <div class="field full split-box">
+            <label class="split-toggle"><input type="checkbox" id="splitOn" /> 🤝 Belah bil (Split)</label>
+            <div id="splitMembers" class="split-members" style="display:none;">
+              <div class="split-members-head">Nama peserta (termasuk anda)</div>
+              <div id="splitMemberList" class="split-member-list"></div>
+              <div class="split-add-row">
+                <input type="text" id="splitNewName" maxlength="20" placeholder="Nama peserta" />
+                <button type="button" class="btn-ghost" id="splitAddBtn">+ Tambah</button>
+              </div>
+              <div class="split-info" id="splitInfo"></div>
+            </div>
+          </div>
+
           <button type="button" class="btn-ghost btn-cat-toggle" id="catToggleBtn">+ Kategori Baru</button>
           <button type="submit" class="btn-primary">+ Tambah Rekod</button>
           <div class="snackbar" id="snackbar"></div>
@@ -180,11 +202,12 @@
         <input type="search" id="searchInput" placeholder="🔍 Cari nota / kategori..." class="search-input" />
       </div>
       <div class="cat-filter" id="catFilter"></div>
+      <div class="reminder-box" id="reminderBox" style="display:none;"></div>
       <div id="txList" class="tx-list"></div>
     </section>
 
     <footer class="foot">
-      Data disimpan secara lokal di pelayar anda (v1.3). Log masuk akaun awan tersedia untuk sinkronisasi merentasi peranti.
+      Data disimpan secara lokal di pelayar anda (v1.4). Log masuk akaun awan tersedia untuk sinkronisasi merentasi peranti.
     </footer>
   </div>
 
@@ -211,6 +234,64 @@
           <button type="submit" class="btn-primary">Simpan</button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- S4/S6/S7/S8: Settings Modal -->
+  <div class="modal-overlay" id="settingsModal" style="display:none;">
+    <div class="modal-box">
+      <h3>⚙️ Tetapan</h3>
+      <div class="set-row">
+        <span>Nama profil</span>
+        <input type="text" id="setProfileName" maxlength="24" placeholder="Nama anda" />
+      </div>
+      <div class="set-row">
+        <span>Mata wang</span>
+        <select id="setCurrency">
+          <option value="RM">RM (Malaysia)</option>
+          <option value="USD">$ (US Dollar)</option>
+          <option value="SGD">S$ (Singapore)</option>
+          <option value="IDR">Rp (Indonesia)</option>
+        </select>
+      </div>
+      <div class="set-row">
+        <span>Tema</span>
+        <select id="setTheme">
+          <option value="dark">Gelap</option>
+          <option value="light">Cerah</option>
+          <option value="auto">Ikut Sistem</option>
+        </select>
+      </div>
+      <div class="set-row set-row-col">
+        <span>QR DuitNow (terima duit)</span>
+        <div class="qr-box">
+          <img id="setQrPreview" class="qr-preview" alt="QR" style="display:none;" />
+          <input type="file" id="setQrFile" accept="image/*" />
+          <button type="button" class="btn-ghost" id="setQrRemove" style="display:none;">Buang QR</button>
+        </div>
+      </div>
+      <p class="set-note">Profil &amp; mata wang disimpan secara lokal. Sync merentas peranti hadir bila akaun dihidupkan.</p>
+      <div class="modal-actions">
+        <button type="button" class="btn-ghost" id="closeSettingsBtn">Tutup</button>
+        <button type="button" class="btn-primary" id="saveSettingsBtn">Simpan</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Q2/Q3: Share Bill + Reminder Modal -->
+  <div class="modal-overlay" id="shareModal" style="display:none;">
+    <div class="modal-box">
+      <h3>🤝 Kongsi Bil</h3>
+      <div id="shareBody" class="share-body"></div>
+      <div class="qr-share" id="shareQrWrap" style="display:none;">
+        <div class="qr-share-label">Imbas QR untuk bayar:</div>
+        <img id="shareQrImg" class="qr-preview-lg" alt="QR" />
+      </div>
+      <label class="share-remind"><input type="checkbox" id="shareRemindOn" /> 🔔 Ingatkan saya hantar bil ini</label>
+      <div class="modal-actions">
+        <button type="button" class="btn-ghost" onclick="closeShare()">Tutup</button>
+        <button type="button" class="btn-primary" id="shareCopyBtn">Salin Teks</button>
+      </div>
     </div>
   </div>
 
