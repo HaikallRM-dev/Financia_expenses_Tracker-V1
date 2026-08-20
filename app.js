@@ -40,9 +40,10 @@
 
   // A1: Supabase config (awak bagi URL + anon key)
   const SUPABASE_URL = "https://knneeyyhewylmogdcwzz.supabase.co";
-  const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtubmVleXloZXd5bG1vZ2Rjd3p6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY4ODE2MjUsImV4cCI6MjEwMjQ1NzYyNX0.Jb2NtW8cd1gG1o3uJpJJCJQ7r5zsEKG83zgsrwHyDiA";
+  const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtubmVeyXloZXd5bG1vZ2Rjd3p6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY4ODE2MjUsImV4cCI6MjEwMjQ1NzYyNX0.Jb2NtW8cd1gG1o3uJpJJCJQ7r5zsEKG83zgsrwHyDiA";
   const SUPABASE_TABLE = "transactions"; // table yang awak buat (bukan Expenses lama)
   let authMode = "login"; // "login" | "register"
+  const PROFILE_KEY = "fet_active_profile"; // <-- FIX: ni yang hilang, sebab error
   const CURRENCY_KEY = "fet_currency";
   const THEME_KEY = "fet_theme";
   const QR_KEY = "fet_qr";
