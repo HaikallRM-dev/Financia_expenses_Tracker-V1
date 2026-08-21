@@ -439,7 +439,7 @@
 
     els.monthLabel.textContent = showAll ? "Semua" : monthName(viewMonth);
     els.allToggle.classList.toggle("active", showAll);
-    renderProfile();
+    renderProfileHeader();
     renderBudget();
     renderCatFilter();
     renderInsights();
