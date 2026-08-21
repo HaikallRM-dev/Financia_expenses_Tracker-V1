@@ -17,10 +17,10 @@
     <!-- ============ HEADER ============ -->
     <header class="topbar">
       <div class="brand">
-        <div class="brand-logo">RM</div>
+        <div class="brand-logo" id="brandAvatarWrap">RM</div>
         <div>
           <h1>Financial Expenses Tracker</h1>
-          <p class="brand-sub">Track your spending. Know where your money goes.</p>
+          <p class="brand-sub" id="brandProfileName">Track your spending. Know where your money goes.</p>
         </div>
       </div>
       <div class="topbar-actions">
@@ -231,6 +231,16 @@
   <div class="modal-overlay" id="settingsModal" style="display:none;">
     <div class="modal-box">
       <h3>⚙️ Tetapan</h3>
+      <div class="set-row set-row-col">
+        <span>Profil &amp; Akaun</span>
+        <div class="profile-box">
+          <img id="setAvatarPreview" class="avatar-preview" alt="Avatar" style="display:none;" />
+          <input type="file" id="setAvatarFile" accept="image/*" />
+          <button type="button" class="btn-ghost" id="setAvatarRemove" style="display:none;">Buang Avatar</button>
+        </div>
+        <select id="profileSelect" class="profile-select"></select>
+        <button type="button" class="btn-ghost" id="addProfileBtn">+ Profil Baru</button>
+      </div>
       <div class="set-row">
         <span>Nama profil</span>
         <input type="text" id="setProfileName" maxlength="24" placeholder="Nama anda" />

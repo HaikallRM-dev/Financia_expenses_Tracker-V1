@@ -49,6 +49,8 @@
   const QR_KEY = "fet_qr";
   const REMIND_KEY = "fet_reminders";
   const LEGACY_KEY = "fet_transactions"; // Kunci lama (v1.1) untuk migration
+  const AVATAR_KEY = "fet_avatar"; // 1.2: base64 avatar
+  const PROFILES_KEY = "fet_profiles"; // 1.3: senarai profil ["User","Lia",...]
 
   // Q1: QR DuitNow (base64)
   let userQR = localStorage.getItem(QR_KEY) || "";
@@ -468,9 +470,15 @@
     });
   }
 
-  function renderProfile() {
-    if (els.profileName) els.profileName.textContent = currentProfile;
-    if (els.profileInitial) els.profileInitial.textContent = currentProfile.charAt(0).toUpperCase();
+  function renderProfileHeader() {
+    const wrap = document.getElementById("brandAvatarWrap");
+    const nameEl = document.getElementById("brandProfileName");
+    const av = localStorage.getItem(AVATAR_KEY);
+    if (wrap) {
+      if (av) { wrap.innerHTML = `<img src="${av}" alt="AV" style="width:100%;height:100%;border-radius:50%;object-fit:cover;" />`; }
+      else { wrap.textContent = currentProfile === "User" ? "RM" : currentProfile.charAt(0).toUpperCase(); }
+    }
+    if (nameEl) nameEl.textContent = currentProfile === "User" ? "Track your spending. Know where your money goes." : currentProfile;
   }
 
   // Phase 9: Monthly Comparison card
@@ -768,6 +776,10 @@
   }
 
   // ===== S4/S6/S7/S8: Settings =====
+  function getProfiles() {
+    try { const p = JSON.parse(localStorage.getItem(PROFILES_KEY) || "[]"); return Array.isArray(p) && p.length ? p : ["User"]; }
+    catch (e) { return ["User"]; }
+  }
   function openSettings() {
     const nm = document.getElementById("setProfileName");
     const cur = document.getElementById("setCurrency");
@@ -775,6 +787,14 @@
     if (nm) nm.value = currentProfile === "User" ? "" : currentProfile;
     if (cur) cur.value = CURRENCY;
     if (th) th.value = localStorage.getItem(THEME_KEY) || "dark";
+    // 1.2: avatar preview
+    const av = localStorage.getItem(AVATAR_KEY);
+    const avPrev = document.getElementById("setAvatarPreview");
+    const avRm = document.getElementById("setAvatarRemove");
+    if (avPrev) { if (av) { avPrev.src = av; avPrev.style.display = "block"; avRm.style.display = "inline-block"; } else { avPrev.style.display = "none"; avRm.style.display = "none"; } }
+    // 1.3: profile dropdown
+    const sel = document.getElementById("profileSelect");
+    if (sel) { sel.innerHTML = getProfiles().map((p) => `<option value="${p}" ${p === currentProfile ? "selected" : ""}>${p}</option>`).join(""); }
     document.getElementById("settingsModal").style.display = "flex";
   }
   function closeSettings() {
@@ -790,6 +810,11 @@
     // S5: profile name (local) — sync device bila Login siap
     currentProfile = name.slice(0, 24);
     localStorage.setItem(PROFILE_KEY, currentProfile);
+    // 1.3: ensure profile in list
+    const profs = getProfiles();
+    if (!profs.includes(currentProfile)) { profs.push(currentProfile); localStorage.setItem(PROFILES_KEY, JSON.stringify(profs)); }
+    // 1.2: avatar (disimpan bila user pilih file, pendingAvatar buffer)
+    if (typeof pendingAvatar !== "undefined" && pendingAvatar) { localStorage.setItem(AVATAR_KEY, pendingAvatar); }
     // S6: currency
     CURRENCY = currency;
     localStorage.setItem(CURRENCY_KEY, currency);
@@ -801,6 +826,7 @@
     userQR = pendingQR || "";
     loadData();
     refreshCategories();
+    renderProfileHeader();
     render();
     renderReminders();
     closeSettings();
@@ -819,6 +845,7 @@
 
   // ===== Q1: QR DuitNow =====
   let pendingQR = ""; // buffer semasa pilih file
+  let pendingAvatar = ""; // 1.2: buffer avatar
   function handleQrFile(file) {
     if (!file) return;
     const reader = new FileReader();
@@ -1054,6 +1081,59 @@
     const qrRemove = document.getElementById("setQrRemove");
     if (qrRemove) qrRemove.addEventListener("click", removeQr);
 
+    // 1.2: Avatar handlers
+    const avFile = document.getElementById("setAvatarFile");
+    if (avFile) avFile.addEventListener("change", (e) => {
+      const f = e.target.files[0];
+      if (!f) return;
+      const r = new FileReader();
+      r.onload = (ev) => {
+        pendingAvatar = ev.target.result;
+        const prev = document.getElementById("setAvatarPreview");
+        const rm = document.getElementById("setAvatarRemove");
+        if (prev) { prev.src = pendingAvatar; prev.style.display = "block"; }
+        if (rm) rm.style.display = "inline-block";
+      };
+      r.readAsDataURL(f);
+    });
+    const avRemove = document.getElementById("setAvatarRemove");
+    if (avRemove) avRemove.addEventListener("click", () => {
+      pendingAvatar = "";
+      localStorage.removeItem(AVATAR_KEY);
+      const prev = document.getElementById("setAvatarPreview");
+      const inp = document.getElementById("setAvatarFile");
+      if (prev) { prev.src = ""; prev.style.display = "none"; }
+      if (avRemove) avRemove.style.display = "none";
+      if (inp) inp.value = "";
+      renderProfileHeader();
+    });
+    // 1.3: profile switch + add
+    const profileSelect = document.getElementById("profileSelect");
+    if (profileSelect) profileSelect.addEventListener("change", (e) => {
+      currentProfile = e.target.value;
+      localStorage.setItem(PROFILE_KEY, currentProfile);
+      loadData();
+      refreshCategories();
+      renderProfileHeader();
+      render();
+    });
+    const addProfileBtn = document.getElementById("addProfileBtn");
+    if (addProfileBtn) addProfileBtn.addEventListener("click", () => {
+      const nm = prompt("Nama profil baru:");
+      if (!nm || !nm.trim()) return;
+      const n = nm.trim().slice(0, 24);
+      const profs = getProfiles();
+      if (!profs.includes(n)) { profs.push(n); localStorage.setItem(PROFILES_KEY, JSON.stringify(profs)); }
+      currentProfile = n;
+      localStorage.setItem(PROFILE_KEY, currentProfile);
+      loadData();
+      refreshCategories();
+      renderProfileHeader();
+      render();
+      openSettings(); // refresh dropdown
+      showSnack("Profil '" + n + "' aktif.", true);
+    });
+
     // Q2/Q3: Share + reminder
     const shareCopyBtn = document.getElementById("shareCopyBtn");
     if (shareCopyBtn) shareCopyBtn.addEventListener("click", copyShareText);
@@ -1154,6 +1234,7 @@
     // P0 FIX: Supabase init LAST + try/catch — app jalan walaupun Supabase gagal
     setupAuth();
 
+    renderProfileHeader();
     render();
   }
 
