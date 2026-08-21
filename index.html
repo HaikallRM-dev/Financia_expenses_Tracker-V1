@@ -229,50 +229,72 @@
 
   <!-- S4/S6/S7/S8: Settings Modal -->
   <div class="modal-overlay" id="settingsModal" style="display:none;">
-    <div class="modal-box">
-      <h3>⚙️ Tetapan</h3>
-      <div class="set-row set-row-col">
-        <span>Profil &amp; Akaun</span>
-        <div class="profile-box">
-          <img id="setAvatarPreview" class="avatar-preview" alt="Avatar" style="display:none;" />
-          <input type="file" id="setAvatarFile" accept="image/*" />
-          <button type="button" class="btn-ghost" id="setAvatarRemove" style="display:none;">Buang Avatar</button>
+    <div class="modal-box settings-box">
+      <div class="settings-head">
+        <h3>⚙️ Tetapan</h3>
+        <button type="button" class="modal-x" id="closeSettingsBtn">✕</button>
+      </div>
+
+      <!-- Profile card -->
+      <div class="set-card">
+        <div class="set-card-title">👤 Profil &amp; Akaun</div>
+        <div class="profile-row">
+          <div class="avatar-wrap">
+            <img id="setAvatarPreview" class="avatar-preview" alt="Avatar" style="display:none;" />
+            <div id="avatarPlaceholder" class="avatar-ph">P</div>
+            <label class="avatar-edit" title="Tukar gambar">
+              <input type="file" id="setAvatarFile" accept="image/*" hidden />
+              <span>📷</span>
+            </label>
+          </div>
+          <div class="profile-fields">
+            <label class="field-block">
+              <span>Nama panggilan</span>
+              <input type="text" id="setProfileName" maxlength="24" placeholder="Nama anda" />
+            </label>
+            <select id="profileSelect" class="profile-select"></select>
+            <button type="button" class="btn-ghost btn-sm" id="addProfileBtn">+ Profil Baru</button>
+          </div>
         </div>
-        <select id="profileSelect" class="profile-select"></select>
-        <button type="button" class="btn-ghost" id="addProfileBtn">+ Profil Baru</button>
       </div>
-      <div class="set-row">
-        <span>Nama profil</span>
-        <input type="text" id="setProfileName" maxlength="24" placeholder="Nama anda" />
+
+      <!-- Preferences card -->
+      <div class="set-card">
+        <div class="set-card-title">⚙️ Keutamaan</div>
+        <div class="set-line">
+          <span>Mata wang</span>
+          <select id="setCurrency">
+            <option value="RM">RM (Malaysia)</option>
+            <option value="USD">$ (US Dollar)</option>
+            <option value="SGD">S$ (Singapore)</option>
+            <option value="IDR">Rp (Indonesia)</option>
+          </select>
+        </div>
+        <div class="set-line">
+          <span>Tema</span>
+          <select id="setTheme">
+            <option value="dark">Gelap</option>
+            <option value="light">Cerah</option>
+            <option value="auto">Ikut Sistem</option>
+          </select>
+        </div>
       </div>
-      <div class="set-row">
-        <span>Mata wang</span>
-        <select id="setCurrency">
-          <option value="RM">RM (Malaysia)</option>
-          <option value="USD">$ (US Dollar)</option>
-          <option value="SGD">S$ (Singapore)</option>
-          <option value="IDR">Rp (Indonesia)</option>
-        </select>
-      </div>
-      <div class="set-row">
-        <span>Tema</span>
-        <select id="setTheme">
-          <option value="dark">Gelap</option>
-          <option value="light">Cerah</option>
-          <option value="auto">Ikut Sistem</option>
-        </select>
-      </div>
-      <div class="set-row set-row-col">
-        <span>QR DuitNow (terima duit)</span>
-        <div class="qr-box">
+
+      <!-- QR card -->
+      <div class="set-card">
+        <div class="set-card-title">📲 QR DuitNow (terima duit)</div>
+        <div class="qr-row">
           <img id="setQrPreview" class="qr-preview" alt="QR" style="display:none;" />
-          <input type="file" id="setQrFile" accept="image/*" />
-          <button type="button" class="btn-ghost" id="setQrRemove" style="display:none;">Buang QR</button>
+          <div class="qr-actions">
+            <input type="file" id="setQrFile" accept="image/*" />
+            <button type="button" class="btn-ghost btn-sm" id="setQrRemove" style="display:none;">Buang QR</button>
+          </div>
         </div>
       </div>
+
       <p class="set-note">Profil &amp; mata wang disimpan secara lokal. Sync merentas peranti hadir bila akaun dihidupkan.</p>
       <div class="modal-actions">
-        <button type="button" class="btn-ghost" id="closeSettingsBtn">Tutup</button>
+        <button type="button" class="btn-ghost" id="closeSettingsBtn2">Tutup</button>
         <button type="button" class="btn-primary" id="saveSettingsBtn">Simpan</button>
       </div>
     </div>

@@ -790,8 +790,9 @@
     // 1.2: avatar preview
     const av = localStorage.getItem(AVATAR_KEY);
     const avPrev = document.getElementById("setAvatarPreview");
+    const avPh = document.getElementById("avatarPlaceholder");
     const avRm = document.getElementById("setAvatarRemove");
-    if (avPrev) { if (av) { avPrev.src = av; avPrev.style.display = "block"; avRm.style.display = "inline-block"; } else { avPrev.style.display = "none"; avRm.style.display = "none"; } }
+    if (avPrev) { if (av) { avPrev.src = av; avPrev.style.display = "block"; if (avPh) avPh.style.display = "none"; } else { avPrev.style.display = "none"; if (avPh) { avPh.style.display = "flex"; avPh.textContent = (currentProfile === "User" ? "P" : currentProfile.charAt(0).toUpperCase()); } } }
     // 1.3: profile dropdown
     const sel = document.getElementById("profileSelect");
     if (sel) { sel.innerHTML = getProfiles().map((p) => `<option value="${p}" ${p === currentProfile ? "selected" : ""}>${p}</option>`).join(""); }
@@ -1065,14 +1066,14 @@
 
     // S4: Settings modal (auth-aware: buka login jika belum login)
     if (settingsBtn) settingsBtn.addEventListener("click", () => {
-      const c = sb();
-      if (c && c.auth && c.auth.currentUser) openSettings();
-      else openAuth();
+      openSettings(); // A: buka terus tanpa halang login (profile local)
     });
     const saveSettingsBtn = document.getElementById("saveSettingsBtn");
     if (saveSettingsBtn) saveSettingsBtn.addEventListener("click", saveSettings);
     const closeSettingsBtn = document.getElementById("closeSettingsBtn");
     if (closeSettingsBtn) closeSettingsBtn.addEventListener("click", closeSettings);
+    const closeSettingsBtn2 = document.getElementById("closeSettingsBtn2");
+    if (closeSettingsBtn2) closeSettingsBtn2.addEventListener("click", closeSettings);
     applyThemeAuto(); // S7: system theme on load if "auto"
 
     // Q1: QR file handlers
