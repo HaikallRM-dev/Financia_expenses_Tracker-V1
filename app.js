@@ -1,6 +1,11 @@
 (() => {
   "use strict";
 
+  // v1.4 fix: check localStorage availability FIRST
+  if (typeof localStorage === "undefined") {
+    alert("❌ localStorage tidak tersedia!\n\nPastikan awak buka app ini melalui web server (VS Code Live Server), bukan double-click file HTML.\n\nData TIDAK akan disimpan bila refresh.");
+  }
+
   let currentProfile = "User";
   let transactions = [];
   let budgets = {};
