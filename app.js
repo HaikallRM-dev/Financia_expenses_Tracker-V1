@@ -53,7 +53,7 @@
   const THEME_KEY = "fet_theme";
   const QR_KEY = "fet_qr";
   const REMIND_KEY = "fet_reminders";
-  const LEGACY_KEY = "fet_transactions"; // Kunci lama (v1.1) untuk migration
+  const LEGACY_KEY = "fet_transactions_legacy"; // Kunci lama (v1.1) untuk migration — BEZAKAN dari TX_KEY!
   const AVATAR_KEY = "fet_avatar"; // 1.2: base64 avatar
   const PROFILES_KEY = "fet_profiles"; // 1.3: senarai profil ["User","Lia",...]
 
