@@ -53,12 +53,14 @@
   const PROFILES_KEY = "fet_profiles"; // 1.3: senarai profil ["User","Lia",...]
 
   // Q1: QR DuitNow (base64)
-  let userQR = localStorage.getItem(QR_KEY) || "";
+  let userQR = "";
+  try { userQR = localStorage.getItem(QR_KEY) || ""; } catch (e) { userQR = ""; }
   let reminders = [];
   try { reminders = JSON.parse(localStorage.getItem(REMIND_KEY) || "[]"); } catch (e) { reminders = []; }
 
   // S6: Currency formatter (dynamic)
-  let CURRENCY = localStorage.getItem(CURRENCY_KEY) || "RM";
+  let CURRENCY = "RM";
+  try { CURRENCY = localStorage.getItem(CURRENCY_KEY) || "RM"; } catch (e) { CURRENCY = "RM"; }
   const CURRENCY_SYMBOL = { RM: "RM", USD: "$", SGD: "S$", IDR: "Rp" };
   function fmtRM(n) {
     const sym = CURRENCY_SYMBOL[CURRENCY] || "RM";
@@ -137,7 +139,9 @@
   }
 
   function loadLocal() {
-    currentProfile = localStorage.getItem(PROFILE_KEY) || "User";
+    try {
+      currentProfile = localStorage.getItem(PROFILE_KEY) || "User";
+    } catch (e) { currentProfile = "User"; }
     try {
       transactions = JSON.parse(localStorage.getItem(TX_KEY()) || "[]");
       if (!Array.isArray(transactions)) transactions = [];
